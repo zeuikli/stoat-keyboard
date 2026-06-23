@@ -1,0 +1,19 @@
+# Xcode build artifacts（僅鍵盤專案的 build/，勿誤傷 RimeData/build 的預編譯 .bin）
+/OnionKB/build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# 由 project.yml 經 xcodegen 產生（不入庫，clone 後執行 `xcodegen generate`）
+*.xcodeproj
+*.xcworkspace
+
+# 封裝產物
+*.ipa
+Payload/
+
+# macOS
+.DS_Store
+
+# 雜項
+*.log

@@ -1,0 +1,65 @@
+name: OnionKB
+options:
+  bundleIdPrefix: com.frost
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: ""
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGNING_ALLOWED: "NO"
+    ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+    # rime 標頭（slice 無關）+ 自家 ObjC++ bridge
+    HEADER_SEARCH_PATHS: ["$(SRCROOT)/Shared/Rime", "$(SRCROOT)/../ios-build/out/headers"]
+    CLANG_CXX_LANGUAGE_STANDARD: "gnu++17"
+    CLANG_CXX_LIBRARY: "libc++"
+    # -force_load 必須：否則 librime-lua plugin 的 module 註冊子被 dead-strip（§26.3）。
+    # 不用 xcframework 自動連結（會與 force_load 重複），改 per-slice 顯式連結。
+    OTHER_LDFLAGS[sdk=iphoneos*]: ["-force_load", "$(SRCROOT)/../ios-build/out/librime.xcframework/ios-arm64/librime_full.a", "-lc++", "-liconv", "-lz"]
+    OTHER_LDFLAGS[sdk=iphonesimulator*]: ["-force_load", "$(SRCROOT)/../ios-build/out/librime.xcframework/ios-arm64-simulator/librime_full.a", "-lc++", "-liconv", "-lz"]
+targets:
+  OnionKB:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+      - path: Shared
+      - path: ../RimeData
+        name: RimeData
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.frost.stoat
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/App.entitlements
+        GENERATE_INFOPLIST_FILE: "NO"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_OBJC_BRIDGING_HEADER: App/OnionKB-Bridging-Header.h
+    dependencies:
+      - target: OnionKBKeyboard
+        embed: true
+
+  OnionKBKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Keyboard
+      - path: Shared
+      - path: ../RimeData
+        name: RimeData
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.frost.stoat.keyboard
+        INFOPLIST_FILE: Keyboard/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Keyboard/Keyboard.entitlements
+        GENERATE_INFOPLIST_FILE: "NO"
+        SWIFT_OBJC_BRIDGING_HEADER: Keyboard/OnionKBKeyboard-Bridging-Header.h
