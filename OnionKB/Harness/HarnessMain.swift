@@ -1,0 +1,62 @@
+import UIKit
+
+/// 截圖驗證用 harness（非正式產品）：把 KeyboardViewController 嵌進一般 App 顯示，
+/// 供 simulator 截圖驗證顏色/圓角/版面（本機無鍵盤 GUI 權限的替代方案）。
+@main
+final class HarnessAppDelegate: UIResponder, UIApplicationDelegate {
+    var window: UIWindow?
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        let win = UIWindow(frame: UIScreen.main.bounds)
+        win.rootViewController = HarnessVC()
+        win.makeKeyAndVisible()
+        window = win
+        return true
+    }
+}
+
+final class HarnessVC: UIViewController {
+    private let kb = KeyboardViewController()
+    private let field = UITextField()
+    private var nativeMode: Bool { ProcessInfo.processInfo.environment["NATIVE_KB"] == "1" }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .systemBackground   // 白底，方便對比鍵盤灰
+
+        if nativeMode {                            // 原廠鍵盤取色模式：UITextField → 系統鍵盤
+            field.borderStyle = .roundedRect
+            field.placeholder = "native keyboard"
+            field.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(field)
+            NSLayoutConstraint.activate([
+                field.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+                field.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+                field.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 80),
+            ])
+            return
+        }
+
+        let label = UILabel()
+        label.text = "KB Harness — 截圖驗證"
+        label.textColor = .secondaryLabel
+        label.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(label)
+        addChild(kb)
+        kb.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(kb.view)
+        kb.didMove(toParent: self)
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            label.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 60),
+            kb.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            kb.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            kb.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if nativeMode { field.becomeFirstResponder() }
+    }
+}

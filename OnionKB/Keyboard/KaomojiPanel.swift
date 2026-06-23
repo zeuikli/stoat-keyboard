@@ -15,11 +15,13 @@ final class KaomojiPanel: UIView, UICollectionViewDataSource, UICollectionViewDe
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        backgroundColor = UIColor(white: 0.92, alpha: 1)
-        layer.cornerRadius = 12                                       // iOS 26 面板上緣圓角（§90）
-        layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        layer.cornerCurve = .continuous
-        layer.masksToBounds = true
+        backgroundColor = KBColor.panel   // 原廠面板色（§102）
+        if #available(iOS 26.0, *) {                                  // 上緣圓角僅 iOS 26（§94）
+            layer.cornerRadius = 26
+            layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+            layer.cornerCurve = .continuous
+            layer.masksToBounds = true
+        }
         build()
     }
     required init?(coder: NSCoder) { fatalError() }
@@ -113,7 +115,7 @@ final class KaomojiPanel: UIView, UICollectionViewDataSource, UICollectionViewDe
     private func selectGroup(_ i: Int) {
         groupIndex = i
         for case let b as UIButton in chipStack.arrangedSubviews {
-            b.backgroundColor = (b.tag == i) ? UIColor(white: 0.55, alpha: 0.35) : .clear   // 原廠選中灰 pill（§90）
+            b.backgroundColor = (b.tag == i) ? .tertiarySystemFill : .clear   // 原廠選中灰 pill（§90/§99 動態）
         }
         collection.reloadData()
         collection.setContentOffset(.zero, animated: false)
@@ -125,7 +127,7 @@ final class KaomojiPanel: UIView, UICollectionViewDataSource, UICollectionViewDe
         let cell = cv.dequeueReusableCell(withReuseIdentifier: "k", for: ip)
         cell.contentView.subviews.forEach { $0.removeFromSuperview() }
         cell.contentView.clipsToBounds = true
-        cell.backgroundColor = isEmojiGroup ? .clear : .white       // emoji 扁平、顏文字保留淡框（§90）
+        cell.backgroundColor = isEmojiGroup ? .clear : KBColor.contentKey   // emoji 扁平、顏文字保留淡框（§90/§99）
         cell.layer.cornerRadius = isEmojiGroup ? 0 : 8
         cell.layer.cornerCurve = .continuous
         let l = UILabel(frame: cell.contentView.bounds.insetBy(dx: 4, dy: 0))

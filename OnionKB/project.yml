@@ -63,3 +63,23 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Keyboard/Keyboard.entitlements
         GENERATE_INFOPLIST_FILE: "NO"
         SWIFT_OBJC_BRIDGING_HEADER: Keyboard/OnionKBKeyboard-Bridging-Header.h
+
+  # 截圖驗證 harness（嵌 KeyboardViewController 的一般 App，僅供 simulator 截圖）
+  KBHarness:
+    type: application
+    platform: iOS
+    sources:
+      - path: Keyboard
+        excludes: ["Info.plist", "OnionKBKeyboard-Bridging-Header.h"]
+      - path: Shared
+      - path: Harness
+      - path: ../RimeData
+        name: RimeData
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kbtest.harness
+        INFOPLIST_FILE: Harness/Info.plist
+        GENERATE_INFOPLIST_FILE: "NO"
+        SWIFT_OBJC_BRIDGING_HEADER: Keyboard/OnionKBKeyboard-Bridging-Header.h

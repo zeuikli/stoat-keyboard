@@ -15,7 +15,7 @@ final class ClosureSwipe: UISwipeGestureRecognizer {
 /// 按鍵：覆寫 isHighlighted 做原廠按壓高亮（按下即時、放開快速淡出，§57）。
 /// `pressedColor == nil` → 不手動高亮（交給 iOS 26 glass 互動動畫或系統）。
 final class KeyButton: UIButton {
-    var restingColor: UIColor? = .white
+    var restingColor: UIColor? = KBColor.contentKey
     var pressedColor: UIColor? = .systemGray4
     override var isHighlighted: Bool {
         didSet {
@@ -27,6 +27,24 @@ final class KeyButton: UIButton {
             }
         }
     }
+}
+
+/// 原廠色盤（§99）：動態色，依 traitCollection 深淺自動解析，鍵盤隨系統深色模式切換。
+enum KBColor {
+    private static func dyn(_ light: UIColor, _ dark: UIColor) -> UIColor {
+        UIColor { $0.userInterfaceStyle == .dark ? dark : light }
+    }
+    /// 鍵盤底（原廠 iOS 26 精確量測，§102）：淺 #E2E4E8 / 深 #171717
+    static let panel = dyn(UIColor(red: 226/255, green: 228/255, blue: 232/255, alpha: 1),
+                           UIColor(red: 23/255, green: 23/255, blue: 23/255, alpha: 1))
+    /// 內容鍵（白 / #3D3D3D）
+    static let contentKey = dyn(.white,
+                                UIColor(red: 61/255, green: 61/255, blue: 61/255, alpha: 1))
+    /// 功能鍵：iOS 26 與內容鍵同色（無灰功能鍵，§102）
+    static let funcKey = contentKey
+    /// 功能鍵按下（暗一階）
+    static let funcKeyPressed = dyn(UIColor(red: 209/255, green: 211/255, blue: 215/255, alpha: 1),
+                                    UIColor(red: 94/255, green: 94/255, blue: 94/255, alpha: 1))
 }
 
 /// 注音鍵盤主控制器（SPEC §7.2 / §15.3 / §24 / §27）。
@@ -52,6 +70,10 @@ final class KeyboardViewController: UIInputViewController {
     private let expandButton = UIButton(type: .system)             // 候選展開/收合 chevron（§89）
     private var expandedPanel: UIScrollView?                       // 展開候選格面板（§89）
     private var isExpanded = false
+    // 真 Liquid Glass 層（§97，官方 UIGlassContainerEffect 容器 + 巢狀 glass）
+    private var glassContainer: UIVisualEffectView?
+    private var glassKeyButtons: [(button: UIButton, prominent: Bool)] = []   // 本輪 rebuild 登記的玻璃鍵
+    private var glassPairs: [(button: UIButton, glass: UIVisualEffectView)] = []
     private enum KBMode { case bopomo, english, numbers }
     private var mode: KBMode = .bopomo
     private var lastLetterMode: KBMode = .bopomo                   // 123 返回的字母模式（注音/英文）
@@ -73,25 +95,49 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(white: 0.82, alpha: 1)
-        view.layer.cornerRadius = 12                                 // iOS 26 鍵盤上緣圓角（§90）
-        view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        view.layer.cornerCurve = .continuous
-        view.layer.masksToBounds = true
+        view.backgroundColor = KBColor.panel   // 原廠 opaque #E2E4E8/#171717（§102）
+        if isOS26 {                                                  // 上緣圓角僅 iOS 26（§94）；16–18 方正貼原廠
+            view.layer.cornerRadius = 26                             // 原廠量測 ~26pt 視覺（§102）
+            view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+            view.layer.cornerCurve = .continuous
+            view.layer.masksToBounds = true
+        }
         buildUI()
         applyOptionDefaults()   // 套用容器 App 設定的選項預設（§27 #1）
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        applyKeyboardAppearance()   // 跟隨 App 要求的鍵盤深淺（§99，如 Telegram 深色）
         // 每次鍵盤出現重套 App 設定（簡繁/全形/標點 + glass/字體/提示）——拾取改設定後的最新值（需 Full Access，§63）
         applyOptionDefaults()
         rebuildKeyRows()
     }
 
+    override func textDidChange(_ textInput: UITextInput?) {
+        super.textDidChange(textInput)
+        applyKeyboardAppearance()   // App 切換/聚焦時深淺可能變
+    }
+
+    /// 依 App 要求的 keyboardAppearance 覆寫深淺；.default → 跟系統（§99）。
+    private func applyKeyboardAppearance() {
+        let style: UIUserInterfaceStyle
+        switch textDocumentProxy.keyboardAppearance {
+        case .dark: style = .dark
+        case .light: style = .light
+        default: style = .unspecified
+        }
+        if overrideUserInterfaceStyle != style { overrideUserInterfaceStyle = style }
+    }
+
     override func viewWillLayoutSubviews() {
         super.viewWillLayoutSubviews()
         applyHeight()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        syncGlassFrames()                               // §97：玻璃 frame 對齊按鈕（layout 後）
     }
 
     private func applyHeight() {
@@ -171,7 +217,7 @@ final class KeyboardViewController: UIInputViewController {
             }
         }
         if #available(iOS 26.0, *) {
-            items.append(toggle("iOS 26 玻璃按鍵", Self.glassKey, localOpt(Self.glassKey, default: false)) { [weak self] _ in self?.rebuildKeyRows() })
+            items.append(toggle("iOS 26 玻璃按鍵", Self.glassKey, localOpt(Self.glassKey, default: Self.realGlass)) { [weak self] _ in self?.rebuildKeyRows() })
         }
         items.append(toggle("常駐數字列", Self.numberRowKey, localOpt(Self.numberRowKey, default: true)) { [weak self] _ in self?.rebuildKeyRows() })
         items.append(toggle("注音鍵英文提示", Self.engHintKey, localOpt(Self.engHintKey)) { [weak self] _ in self?.rebuildKeyRows() })
@@ -198,20 +244,22 @@ final class KeyboardViewController: UIInputViewController {
         compositionLabel.text = " "
 
         optionsButton.setImage(UIImage(systemName: "slider.horizontal.3"), for: .normal)   // 鍵盤內建選項（§65）
-        optionsButton.tintColor = .darkGray
+        optionsButton.tintColor = .secondaryLabel
         optionsButton.widthAnchor.constraint(equalToConstant: 40).isActive = true
         optionsButton.showsMenuAsPrimaryAction = true
         refreshOptionsMenu()
 
         let collapseButton = UIButton(type: .system)               // 縮小/收鍵盤；置右上角避免誤按候選（§56）
         collapseButton.setImage(UIImage(systemName: "keyboard.chevron.compact.down"), for: .normal)
-        collapseButton.tintColor = .darkGray
+        collapseButton.tintColor = .secondaryLabel
         collapseButton.widthAnchor.constraint(equalToConstant: 40).isActive = true
         collapseButton.addAction(UIAction { [weak self] _ in self?.dismissKeyboard() }, for: .touchUpInside)
 
         let preeditRow = UIStackView(arrangedSubviews: [compositionLabel, optionsButton, collapseButton])
         preeditRow.axis = .horizontal
         preeditRow.alignment = .center
+        preeditRow.isLayoutMarginsRelativeArrangement = true        // 讓 preedit 內容避開上緣圓角裁切區（§104）
+        preeditRow.directionalLayoutMargins = .init(top: 0, leading: 14, bottom: 0, trailing: 10)
         let preeditH = preeditRow.heightAnchor.constraint(equalToConstant: 26)
         preeditH.priority = UILayoutPriority(999)   // 可壓縮：host 高度不足時讓位（§58）
         preeditH.isActive = true
@@ -299,6 +347,7 @@ final class KeyboardViewController: UIInputViewController {
     private func rebuildKeyRows() {
         keyRowsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         bopomoKeys.removeAll()
+        glassKeyButtons.removeAll()                     // §97：重新登記本輪玻璃鍵
         cnEnButton = nil; shiftButton = nil
         switch mode {
         case .numbers:
@@ -341,6 +390,7 @@ final class KeyboardViewController: UIInputViewController {
         candidateRowRef?.isHidden = (mode != .bopomo)   // 英文/123 收候選列→去上方留白（§86）
         if mode == .english { refreshEnglishCase() } else { updateModeStyling() }
         applyHeight()                                   // 列數變動即更新高度（§90 原廠風格變動高度）
+        if #available(iOS 26.0, *), Self.realGlass { buildGlassLayer() }   // §97 官方玻璃容器
     }
 
     // MARK: - 英文 QWERTY 頁（§46）
@@ -400,10 +450,10 @@ final class KeyboardViewController: UIInputViewController {
             // glass：Shift 啟用＝藍前景高亮、關閉＝預設（§55）
             shiftButton?.configuration?.baseForegroundColor = shiftState == .off ? .label : .systemBlue
         } else {
-            shiftButton?.tintColor = .black
+            shiftButton?.tintColor = .label
             // 原廠：Shift 啟用＝白底高亮、關閉＝灰底（§49）
-            (shiftButton as? KeyButton)?.restingColor = shiftState == .off ? Self.funcKeyGray : .white
-            shiftButton?.backgroundColor = shiftState == .off ? Self.funcKeyGray : .white
+            (shiftButton as? KeyButton)?.restingColor = shiftState == .off ? Self.funcKeyGray : KBColor.contentKey
+            shiftButton?.backgroundColor = shiftState == .off ? Self.funcKeyGray : KBColor.contentKey
         }
     }
 
@@ -438,9 +488,16 @@ final class KeyboardViewController: UIInputViewController {
         return widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: zh)
     }
 
-    static let funcKeyGray = UIColor(red: 172/255, green: 176/255, blue: 186/255, alpha: 1)
+    static let funcKeyGray = KBColor.funcKey   // §99 動態（淺灰/深灰）
 
     static let keyRadius: CGFloat = 8   // iOS 26 鍵盤鍵圓角（§77，較圓潤）
+
+    // MARK: - 版本分層樣式（§93/§94 KeyStyle）
+    /// true＝真 Liquid Glass（UIGlassEffect）測試版；false＝主版（iOS26 用 §92 霜白）。出 glass IPA 時翻 true。
+    static let realGlass = false
+    /// iOS 26 以上才套圓角/玻璃等「未來感」視覺；16–18 走原廠 classic（方正、實心）。
+    private var isOS26: Bool { if #available(iOS 26.0, *) { return true }; return false }
+    private var keyCornerCurve: CALayerCornerCurve { isOS26 ? .continuous : .circular }
 
     /// iOS 26 「玻璃」鍵（§92）：系統 UIButton.Configuration.glass() 在實機渲染異常
     /// （§88 藍底、§92 浮凸陰影，本機無 GUI 不可重現）→ 改用可預期的**半透明霜白**：
@@ -448,10 +505,66 @@ final class KeyboardViewController: UIInputViewController {
     @available(iOS 26.0, *)
     private func applyGlass(_ b: UIButton, prominent: Bool) {
         b.titleLabel?.font = .systemFont(ofSize: (prominent ? 23 : 16) * fontScale)
-        let rest = UIColor.white.withAlphaComponent(prominent ? 0.55 : 0.30)   // content 較實、function 較透
+        if Self.realGlass {                                       // 真 Liquid Glass（§97 官方容器）：此處只「登記」，玻璃由 buildGlassLayer 統一建
+            b.backgroundColor = .clear
+            b.layer.shadowOpacity = 0
+            if let k = b as? KeyButton {                          // 按壓回饋：clear 底上閃白
+                k.restingColor = .clear
+                k.pressedColor = UIColor.white.withAlphaComponent(0.4)
+            }
+            glassKeyButtons.append((b, prominent))
+            return
+        }
+        let rest = UIColor.white.withAlphaComponent(prominent ? 0.55 : 0.30)   // §92 霜白（主版）：content 較實、function 較透
         let press = UIColor.white.withAlphaComponent(prominent ? 0.85 : 0.60)
         b.backgroundColor = rest
         if let k = b as? KeyButton { k.restingColor = rest; k.pressedColor = press }
+    }
+
+    /// 官方 Liquid Glass 多元件正解（§97）：一個 UIGlassContainerEffect 容器，
+    /// 各鍵 glass 巢狀進其 contentView 合併渲染；容器置按鈕之下，按鈕 clear 底→玻璃透出、label/icon 在上。
+    @available(iOS 26.0, *)
+    private func buildGlassLayer() {
+        teardownGlassLayer()
+        guard Self.realGlass, let rs = rootStack, rs.superview != nil, !glassKeyButtons.isEmpty else { return }
+        let container = UIVisualEffectView(effect: UIGlassContainerEffect())
+        container.isUserInteractionEnabled = false
+        container.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(container, belowSubview: rs)          // 按鈕之下＝玻璃為視覺底層
+        NSLayoutConstraint.activate([
+            container.leadingAnchor.constraint(equalTo: keyRowsStack.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: keyRowsStack.trailingAnchor),
+            container.topAnchor.constraint(equalTo: keyRowsStack.topAnchor),
+            container.bottomAnchor.constraint(equalTo: keyRowsStack.bottomAnchor),
+        ])
+        for (btn, prominent) in glassKeyButtons {
+            let e = UIGlassEffect(style: .clear)
+            e.isInteractive = false                              // 靜態鍵不需互動透鏡（§95）
+            e.tintColor = UIColor.white.withAlphaComponent(prominent ? 0.55 : 0.32)   // 白底（§96），content 較白
+            let g = UIVisualEffectView(effect: e)
+            g.isUserInteractionEnabled = false
+            g.layer.cornerRadius = Self.keyRadius
+            g.layer.cornerCurve = .continuous
+            g.clipsToBounds = true
+            container.contentView.addSubview(g)                 // 巢狀進 container.contentView → 合併渲染
+            glassPairs.append((btn, g))
+        }
+        glassContainer = container
+        view.setNeedsLayout()
+    }
+
+    private func teardownGlassLayer() {
+        glassContainer?.removeFromSuperview()
+        glassContainer = nil
+        glassPairs.removeAll()
+    }
+
+    /// layout 後把各巢狀 glass frame 同步到對應按鈕（座標轉換）。
+    private func syncGlassFrames() {
+        guard let c = glassContainer else { return }
+        for (btn, g) in glassPairs where btn.superview != nil {
+            g.frame = c.contentView.convert(btn.bounds, from: btn)
+        }
     }
 
     /// 功能鍵樣式：iOS 26 + 開關 on → Liquid Glass（regular）；否則灰底 #ABB0BB + 小字 + 原廠按壓高亮。
@@ -463,7 +576,7 @@ final class KeyboardViewController: UIInputViewController {
             b.titleLabel?.font = .systemFont(ofSize: 16 * fontScale)
             if let k = b as? KeyButton {             // 原廠：灰鍵按下變白（§57）
                 k.restingColor = Self.funcKeyGray
-                k.pressedColor = .white
+                k.pressedColor = KBColor.funcKeyPressed
             }
         }
         return b
@@ -568,7 +681,7 @@ final class KeyboardViewController: UIInputViewController {
 
     /// iOS 26 玻璃功能鍵是否啟用（鍵盤本地開關 + 系統版本，§57/§65）。
     private var useGlassKeys: Bool {
-        if #available(iOS 26.0, *) { return localOpt(Self.glassKey, default: false) }   // 預設關：原廠實心白鍵/灰功能鍵（§88）
+        if #available(iOS 26.0, *) { return localOpt(Self.glassKey, default: Self.realGlass) }   // 主版預設關霜白；glass IPA 預設開（§94）
         return false
     }
 
@@ -581,10 +694,10 @@ final class KeyboardViewController: UIInputViewController {
         b.titleLabel?.adjustsFontSizeToFitWidth = true
         b.titleLabel?.minimumScaleFactor = 0.6
         b.titleLabel?.lineBreakMode = .byClipping
-        b.backgroundColor = .white
-        b.setTitleColor(.black, for: .normal)
+        b.backgroundColor = KBColor.contentKey
+        b.setTitleColor(.label, for: .normal)
         b.layer.cornerRadius = Self.keyRadius
-        b.layer.cornerCurve = .continuous                        // iOS 26 squircle 圓角（§90）
+        b.layer.cornerCurve = keyCornerCurve                     // iOS26 squircle / 16–18 circular（§94）
         b.layer.shadowColor = UIColor.black.cgColor               // 原廠 1px 底陰影（§49）
         b.layer.shadowOpacity = 0.3
         b.layer.shadowOffset = CGSize(width: 0, height: 1)
@@ -601,7 +714,7 @@ final class KeyboardViewController: UIInputViewController {
     private func iconButton(_ systemName: String, action: @escaping () -> Void) -> UIButton {
         let b = keyButton(title: "", action: action)
         b.setImage(UIImage(systemName: systemName), for: .normal)
-        b.tintColor = .black
+        b.tintColor = .label
         return b
     }
 
@@ -641,7 +754,7 @@ final class KeyboardViewController: UIInputViewController {
         let english = englishMode
         let upper = typeUppercase
         for (key, main, eng) in bopomoKeys {
-            main.setTitleColor(english ? .systemGray3 : .black, for: .normal)
+            main.setTitleColor(english ? .systemGray3 : .label, for: .normal)
             if english {
                 eng.isHidden = false
                 eng.text = upper ? key.swipeUpper : key.swipeLower   // 標籤反映將輸出的大小寫（iOS 風）
@@ -655,12 +768,12 @@ final class KeyboardViewController: UIInputViewController {
             }
         }
         cnEnButton?.setTitle(english ? "英" : "中", for: .normal)
-        cnEnButton?.setTitleColor(english ? .systemBlue : .black, for: .normal)
+        cnEnButton?.setTitleColor(english ? .systemBlue : .label, for: .normal)
         // Shift 視覺：off ⇧灰 / shifted ⇧藍 / capsLock ⇪藍；注音模式淡化
         let shiftTitle = shiftState == .capsLock ? "⇪" : "⇧"
         shiftButton?.setTitle(shiftTitle, for: .normal)
-        shiftButton?.setTitleColor(!english ? .systemGray3 : (shiftState == .off ? .black : .systemBlue), for: .normal)
-        shiftButton?.backgroundColor = (english && shiftState != .off) ? UIColor.systemBlue.withAlphaComponent(0.15) : UIColor(white: 0.95, alpha: 1)
+        shiftButton?.setTitleColor(!english ? .systemGray3 : (shiftState == .off ? .label : .systemBlue), for: .normal)
+        shiftButton?.backgroundColor = (english && shiftState != .off) ? UIColor.systemBlue.withAlphaComponent(0.15) : KBColor.contentKey
     }
 
     // MARK: - Input
@@ -780,7 +893,7 @@ final class KeyboardViewController: UIInputViewController {
             let b = UIButton(type: .system)
             b.setTitle(cand.text, for: .normal)                    // 原廠候選無編號（§53）
             b.titleLabel?.font = .systemFont(ofSize: 22 * fontScale)
-            b.setTitleColor(.black, for: .normal)
+            b.setTitleColor(.label, for: .normal)
             b.addAction(UIAction { [weak self] _ in
                 self?.apply(self!.engine.selectCandidate(i))
             }, for: .touchUpInside)
@@ -872,10 +985,10 @@ final class KeyboardViewController: UIInputViewController {
         b.titleLabel?.adjustsFontSizeToFitWidth = true           // 長詞縮放不溢出欄（§91）
         b.titleLabel?.minimumScaleFactor = 0.6
         b.titleLabel?.lineBreakMode = .byClipping
-        b.setTitleColor(.black, for: .normal)
+        b.setTitleColor(.label, for: .normal)
         b.backgroundColor = .clear                               // 原廠扁平無框（§91）
         b.restingColor = .clear
-        b.pressedColor = UIColor(white: 0.6, alpha: 0.3)         // 按下淡灰（非白框）
+        b.pressedColor = .systemFill                             // 按下淡灰（動態、非白框，§99）
         b.widthAnchor.constraint(equalToConstant: width).isActive = true
         b.heightAnchor.constraint(equalToConstant: 46).isActive = true
         b.addAction(UIAction { [weak self] _ in
@@ -908,7 +1021,7 @@ final class KeyboardViewController: UIInputViewController {
             let b = UIButton(type: .system)
             b.setTitle(sym, for: .normal)
             b.titleLabel?.font = .systemFont(ofSize: 19 * fontScale)
-            b.setTitleColor(.darkGray, for: .normal)
+            b.setTitleColor(.secondaryLabel, for: .normal)
             b.addAction(UIAction { [weak self] _ in self?.textDocumentProxy.insertText(sym) }, for: .touchUpInside)
             candidateStack.addArrangedSubview(b)
         }
