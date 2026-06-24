@@ -234,6 +234,7 @@ final class KeyboardViewController: UIInputViewController {
     private static let numberRowKey = "kbopt_numberRow"
     private static let quickPunctKey = "kbopt_quickPunct"       // idle 第一列標點段（§121）
     private static let quickKaomojiKey = "kbopt_quickKaomoji"   // idle 第一列顏文字段（§121）
+    private static let collapseFirstRowKey = "kbopt_collapseFirstRow"  // 空第一列時收起（§129）；關＝保留高度、不隨打字跳動
     /// 第一列兩段（標點/顏文字）都關 → idle 時整列空（§123）。
     private var bothQuickRowsOff: Bool {
         !localOpt(Self.quickPunctKey, default: true) && !localOpt(Self.quickKaomojiKey, default: true)
@@ -291,6 +292,8 @@ final class KeyboardViewController: UIInputViewController {
         // idle 第一列：標點 / 顏文字各自開關（§121）
         items.append(toggle("第一列標點", Self.quickPunctKey, localOpt(Self.quickPunctKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         items.append(toggle("第一列顏文字", Self.quickKaomojiKey, localOpt(Self.quickKaomojiKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
+        // §129：空第一列是否收起（關＝保留高度、不隨打字跳動）
+        items.append(toggle("空第一列收起", Self.collapseFirstRowKey, localOpt(Self.collapseFirstRowKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         // 123 標點：自動依中英 / 半形 / 全形（§82）
         let cur = localStore.integer(forKey: Self.n123ModeKey)
         func p123(_ title: String, _ v: Int) -> UIAction {
@@ -1165,7 +1168,10 @@ final class KeyboardViewController: UIInputViewController {
     private func updateCandidateRowVisibility() {
         guard mode == .bopomo else { candidateRowRef?.isHidden = true; return }
         let idle = currentCandidates.isEmpty && isPreeditEmpty
-        candidateRowRef?.isHidden = idle && bothQuickRowsOff
+        // §129：「空第一列收起」可關。關閉時候選列恆保留（即使 idle 全關也不收）→ 高度穩定、
+        // 不會在 idle↔打字間跳動（使用者回報該跳動干擾大）。開啟＝§123 行為（收空列、去留白帶）。
+        let collapse = localOpt(Self.collapseFirstRowKey, default: true)
+        candidateRowRef?.isHidden = collapse && idle && bothQuickRowsOff
     }
 
     // MARK: - 顏文字面板（§36 #3）
