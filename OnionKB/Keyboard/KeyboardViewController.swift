@@ -319,7 +319,13 @@ final class KeyboardViewController: UIInputViewController {
         collapseButton.widthAnchor.constraint(equalToConstant: 40).isActive = true
         collapseButton.addAction(UIAction { [weak self] _ in self?.dismissKeyboard() }, for: .touchUpInside)
 
-        let preeditRow = UIStackView(arrangedSubviews: [compositionLabel, optionsButton, collapseButton])
+        expandButton.setImage(UIImage(systemName: "chevron.down"), for: .normal)   // 下拉候選（§89）；§133 移到控制列
+        expandButton.tintColor = .secondaryLabel
+        expandButton.widthAnchor.constraint(equalToConstant: 36).isActive = true
+        expandButton.addAction(UIAction { [weak self] _ in self?.toggleExpanded() }, for: .touchUpInside)
+
+        // 控制列（§133）：組字 + ⚙ + ⌨ + ⌄ 三控制鍵同列
+        let preeditRow = UIStackView(arrangedSubviews: [compositionLabel, optionsButton, collapseButton, expandButton])
         preeditRow.axis = .horizontal
         preeditRow.alignment = .center
         preeditRow.isLayoutMarginsRelativeArrangement = true        // 讓 preedit 內容避開上緣圓角裁切區（§104）
@@ -328,7 +334,7 @@ final class KeyboardViewController: UIInputViewController {
         preeditH.priority = UILayoutPriority(999)   // 可壓縮：host 高度不足時讓位（§58）
         preeditH.isActive = true
 
-        // 候選：獨立全寬捲動列 + 右側「▾」翻頁鍵
+        // 候選：獨立全寬捲動列（§133 只剩候選，⌄ 已移到控制列）
         candidateStack.axis = .horizontal
         candidateStack.spacing = 12
         candidateStack.alignment = .center
@@ -342,12 +348,8 @@ final class KeyboardViewController: UIInputViewController {
             candidateStack.bottomAnchor.constraint(equalTo: candidateBar.contentLayoutGuide.bottomAnchor),
             candidateStack.heightAnchor.constraint(equalTo: candidateBar.frameLayoutGuide.heightAnchor),
         ])
-        expandButton.setImage(UIImage(systemName: "chevron.down"), for: .normal)   // 原廠灰 chevron（§89，去藍 ▾）
-        expandButton.tintColor = .secondaryLabel
-        expandButton.widthAnchor.constraint(equalToConstant: 36).isActive = true
-        expandButton.addAction(UIAction { [weak self] _ in self?.toggleExpanded() }, for: .touchUpInside)
 
-        let candidateRow = UIStackView(arrangedSubviews: [candidateBar, expandButton])
+        let candidateRow = UIStackView(arrangedSubviews: [candidateBar])
         candidateRow.axis = .horizontal
         candidateRow.spacing = 2
         candidateRowRef = candidateRow
