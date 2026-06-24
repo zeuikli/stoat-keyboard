@@ -69,11 +69,13 @@ final class KaomojiPanel: UIView, UICollectionViewDataSource, UICollectionViewDe
         bottom.translatesAutoresizingMaskIntoConstraints = false
 
         let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .vertical
+        layout.scrollDirection = .horizontal   // 水平左右捲動瀏覽（§136，比照原廠 emoji 鍵盤左右選擇）
         layout.minimumInteritemSpacing = 6
         layout.minimumLineSpacing = 6
         layout.sectionInset = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
         collection = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collection.alwaysBounceHorizontal = true
+        collection.alwaysBounceVertical = false
         collection.backgroundColor = .clear
         collection.dataSource = self
         collection.delegate = self

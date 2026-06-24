@@ -547,7 +547,7 @@ final class KeyboardViewController: UIInputViewController {
     private func englishFunctionRow() -> UIStackView {
         let zh = grayKey(keyButton(title: "中") { [weak self] in self?.setMode(.bopomo) })   // 回注音
         let num = grayKey(keyButton(title: "123") { [weak self] in self?.setMode(.numbers) })
-        let emoji = grayKey(keyButton(title: "😀") { [weak self] in self?.showKaomojiPanel() })
+        let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠無填滿線條笑臉（§135）
         let space = wideSpaceKey()
         let ret = returnKey()
         let keys = [zh, num, emoji, space, ret]
@@ -718,7 +718,7 @@ final class KeyboardViewController: UIInputViewController {
     private func bopomoFunctionRow() -> UIStackView {
         let num = grayKey(keyButton(title: "123") { [weak self] in self?.setMode(.numbers) })
         let cnEn = grayKey(keyButton(title: "英") { [weak self] in self?.setMode(.english) })  // 切英文 QWERTY
-        let emoji = grayKey(keyButton(title: "😀") { [weak self] in self?.showKaomojiPanel() })
+        let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠無填滿線條笑臉（§135）
         let space = wideSpaceKey()
         let ret = returnKey()
         let keys = withGlobe([num, cnEn, emoji, space, ret])
@@ -729,7 +729,7 @@ final class KeyboardViewController: UIInputViewController {
     private func numberFunctionRow() -> UIStackView {
         let backTitle = lastLetterMode == .english ? "ABC" : "注音"
         let back = grayKey(keyButton(title: backTitle) { [weak self] in self?.setMode(self?.lastLetterMode ?? .bopomo) })
-        let emoji = grayKey(keyButton(title: "😀") { [weak self] in self?.showKaomojiPanel() })
+        let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠無填滿線條笑臉（§135）
         let space = wideSpaceKey()
         let ret = returnKey()
         let keys = withGlobe([back, emoji, space, ret])
