@@ -210,7 +210,7 @@ final class KeyboardViewController: UIInputViewController {
         // 由注音反推固定鍵高 → 各模式套同一 rowH，按鍵大小一致
         let rowH = max(38, (KBSettings.keyboardHeight - bopomoChrome - (refRows - 1) * rowGap) / refRows)
         let curRows = CGFloat(max(1, keyRowsStack.arrangedSubviews.count))
-        let chrome = candidateRowVisible ? bopomoChrome : baseChrome   // 候選列隱藏（英/123 或 idle 全關，§123）→ 不佔高
+        let chrome = (mode == .bopomo) ? bopomoChrome : baseChrome   // 候選列僅注音顯示（§130 候選列固定）
         let h = chrome + curRows * rowH + (curRows - 1) * rowGap
         if let c = heightConstraint {
             c.constant = h
@@ -232,15 +232,8 @@ final class KeyboardViewController: UIInputViewController {
     private static let glassKey = "kbopt_glass"
     private static let engHintKey = "kbopt_engHint"
     private static let numberRowKey = "kbopt_numberRow"
-    private static let quickPunctKey = "kbopt_quickPunct"       // idle 第一列標點段（§121）
-    private static let quickKaomojiKey = "kbopt_quickKaomoji"   // idle 第一列顏文字段（§121）
-    private static let collapseFirstRowKey = "kbopt_collapseFirstRow"  // 空第一列時收起（§129）；關＝保留高度、不隨打字跳動
-    /// 第一列兩段（標點/顏文字）都關 → idle 時整列空（§123）。
-    private var bothQuickRowsOff: Bool {
-        !localOpt(Self.quickPunctKey, default: true) && !localOpt(Self.quickKaomojiKey, default: true)
-    }
-    /// 候選列當前是否顯示（供 applyHeight 算高度，§123）。
-    private var candidateRowVisible: Bool { candidateRowRef.map { !$0.isHidden } ?? false }
+    private static let quickPunctKey = "kbopt_quickPunct"       // 第一列標點段顯示（§121）
+    private static let quickKaomojiKey = "kbopt_quickKaomoji"   // 第一列顏文字段顯示（§121）
     private var numberSubPage = 0                       // 123 頁子頁（0/1，§66）
     private var showNumberRow: Bool { localOpt(Self.numberRowKey, default: true) }
 
@@ -289,11 +282,9 @@ final class KeyboardViewController: UIInputViewController {
         }
         items.append(toggle("常駐數字列", Self.numberRowKey, localOpt(Self.numberRowKey, default: true)) { [weak self] _ in self?.rebuildKeyRows() })
         items.append(toggle("注音鍵英文提示", Self.engHintKey, localOpt(Self.engHintKey)) { [weak self] _ in self?.rebuildKeyRows() })
-        // idle 第一列：標點 / 顏文字各自開關（§121）
+        // 第一列固定（§130）：標點 / 顏文字各自決定是否顯示
         items.append(toggle("第一列標點", Self.quickPunctKey, localOpt(Self.quickPunctKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         items.append(toggle("第一列顏文字", Self.quickKaomojiKey, localOpt(Self.quickKaomojiKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
-        // §129：空第一列是否收起（關＝保留高度、不隨打字跳動）
-        items.append(toggle("空第一列收起", Self.collapseFirstRowKey, localOpt(Self.collapseFirstRowKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         // 123 標點：自動依中英 / 半形 / 全形（§82）
         let cur = localStore.integer(forKey: Self.n123ModeKey)
         func p123(_ title: String, _ v: Int) -> UIAction {
@@ -460,7 +451,7 @@ final class KeyboardViewController: UIInputViewController {
             }
             keyRowsStack.addArrangedSubview(bopomoFunctionRow())
         }
-        updateCandidateRowVisibility()   // 英文/123 收候選列（§86）；注音 idle 全關亦收（§123）
+        candidateRowRef?.isHidden = (mode != .bopomo)   // 英文/123 收候選列（§86）；注音恆顯（§130 固定）
         if mode == .english { refreshEnglishCase() } else { updateModeStyling() }
         applyHeight()                                   // 列數變動即更新高度（§90 原廠風格變動高度）
         if #available(iOS 26.0, *), Self.realGlass { buildGlassLayer() }   // §97 官方玻璃容器
@@ -1006,8 +997,6 @@ final class KeyboardViewController: UIInputViewController {
         if update.candidates.isEmpty && update.preedit.isEmpty {
             if isExpanded { collapseExpanded() }                 // 組字清空→自動收合展開面板（§89）
             showQuickSymbols()                                   // 無組字→常用符號/顏文字（§35 #1）
-            updateCandidateRowVisibility()                       // 第一列兩段全關→收整列、騰回高度（§123）
-            applyHeight()
             return
         }
         for (i, cand) in update.candidates.enumerated() {
@@ -1021,8 +1010,6 @@ final class KeyboardViewController: UIInputViewController {
             }, for: .touchUpInside)
             candidateStack.addArrangedSubview(b)
         }
-        updateCandidateRowVisibility()                           // 有候選/組字→候選列必顯（§123）
-        applyHeight()
     }
 
     // MARK: - 候選展開面板（§89，比照原廠格狀展開）
@@ -1154,24 +1141,11 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
-    /// ⚙ 切換 idle 快捷列開關後即時重繪（僅在無組字/無候選時，§121）。
+    /// ⚙ 切換第一列標點/顏文字後即時重繪（候選列固定，只換內容、不動高度，§130）。
     private func refreshIdleQuickRow() {
         guard mode == .bopomo, currentCandidates.isEmpty, isPreeditEmpty, !isExpanded else { return }
         candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         showQuickSymbols()
-        updateCandidateRowVisibility()   // 兩段全關→收整列、騰回高度（§123）
-        applyHeight()
-    }
-
-    /// 候選列顯示與否（§86 + §123）：非注音模式恆隱；注音模式下 idle 且第一列兩段全關時亦隱（去空列），
-    /// 有候選/組字時必顯（打字要看候選）。
-    private func updateCandidateRowVisibility() {
-        guard mode == .bopomo else { candidateRowRef?.isHidden = true; return }
-        let idle = currentCandidates.isEmpty && isPreeditEmpty
-        // §129：「空第一列收起」可關。關閉時候選列恆保留（即使 idle 全關也不收）→ 高度穩定、
-        // 不會在 idle↔打字間跳動（使用者回報該跳動干擾大）。開啟＝§123 行為（收空列、去留白帶）。
-        let collapse = localOpt(Self.collapseFirstRowKey, default: true)
-        candidateRowRef?.isHidden = collapse && idle && bothQuickRowsOff
     }
 
     // MARK: - 顏文字面板（§36 #3）
