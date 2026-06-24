@@ -87,8 +87,24 @@ xcodebuild -project OnionKB.xcodeproj -scheme OnionKB \
   ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build
 ```
 
+**選擇詞庫變體（full / lite）**
+
+`RimeData/build/` 不入庫，打包前先用 `select-variant.sh` 從 `build-full/`（完整）或 `build-lite/`（輕量）生成：
+
+| 變體 | 詞庫 | bundle | 適用 |
+|------|------|--------|------|
+| **full** | 純注音 + 81 萬 phrases.chtp 擴充詞組 | ~80MB | 詞組完整、對齊 Squirrel onionplus |
+| **lite** | 純注音核心（~118K，table.bin 7.5MB）| ~40MB | 輕量、省記憶體 |
+
+兩者皆 B 方案（bgc grammar，候選出「為」）+ librime 1.17.0。
+
+```bash
+bash OnionKB/Scripts/select-variant.sh full    # 或 lite
+```
+
 **裝置 IPA（unsigned，側載重簽）**
 ```bash
+bash OnionKB/Scripts/select-variant.sh full    # 先選變體（full / lite）
 cd OnionKB
 bash Scripts/package-ipa.sh        # 產出 build/ipa/OnionKB.ipa
 ```

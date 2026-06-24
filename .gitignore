@@ -17,3 +17,6 @@ Payload/
 
 # 雜項
 *.log
+
+# 變體 build（由 OnionKB/Scripts/select-variant.sh 從 build-full/ build-lite/ 生成，§131）
+/RimeData/build/
