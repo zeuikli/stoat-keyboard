@@ -2,14 +2,14 @@ __build_info:
   rime_version: 1.16.1
   timestamps:
     bopomo_onion.custom: 0
-    bopomo_onion.schema: 1782141056
-    bopomo_onion_symbols: 1782120552
+    bopomo_onion.schema: 1782279046
+    bopomo_onion_symbols: 1782279046
     bopomo_onion_symbols.custom: 0
-    default: 1782120552
+    default: 1782279046
     default.custom: 0
-    key_bindings: 1782120552
+    key_bindings: 1782279046
     key_bindings.custom: 0
-    punctuation: 1782120552
+    punctuation: 1782279046
     punctuation.custom: 0
 bpm_reverse_lookup:
   comment_format:
@@ -55,17 +55,9 @@ editor:
     KP_Enter: confirm
     Return: confirm
     "Shift+Return": commit_raw_input
-emoji:
-  opencc_config: emoji_t.json
-  option_name: emoji
-  tags:
-    - abc
-  tips: none
 engine:
   filters:
     - "simplifier@zh_cn"
-    - "simplifier@emoji"
-    - "simplifier@kaomoji"
     - "reverse_lookup_filter@bpm_reverse_lookup"
     - uniquifier
   processors:
@@ -90,13 +82,7 @@ engine:
     - "table_translator@custom_phrase"
     - script_translator
 grammar:
-  language: "zh-hant-t-essay-bgw"
-kaomoji:
-  opencc_config: kaomoji_t.json
-  option_name: kaomoji
-  tags:
-    - abc
-  tips: none
+  language: "zh-hant-t-essay-bgc"
 key_binder:
   bindings:
     - {accept: "Control+p", send: Up, when: composing}
@@ -807,7 +793,6 @@ speller:
     - "erase|^＊([bpmfdtnlgkhjqx])$||"
     - "xform|^＊([ZCSrzcsiuvaoeEAIOUMNKGR])$|$1 |"
     - "xform|^＊＊||"
-    - "derive/^([bpmfdtnlgkhjqxZCSrzcs])([iuvaoeEAIOUMNKGR]+)([12345])$/$2$1$3/"
     - "xlit|bpmfdtnlgkhjqxZCSrzcsiuvaoeEAIOUMNKGR12345|1qaz2wsxedcrfv5tgbyhnujm8ik,9ol.0p;/- 6347|"
   alphabet: "1qaz2wsxedcrfv5tgbyhnujm8ik,9ol.0p;/-3467 "
   delimiter: "\\"
@@ -830,19 +815,10 @@ switches:
   - name: prediction
     reset: 1
     states: ["關閉預測", "開啓預測"]
-  - name: emoji
-    reset: 1
-    states: ["關閉表情", "開啓表情"]
-  - name: kaomoji
-    reset: 0
-    states: ["關閉顏文字", "開啓顏文字"]
 translator:
-  contextual_suggestions: true
   dictionary: bopomo_onion.extended
   enable_completion: false
   enable_user_dict: true
-  max_homographs: 7
-  max_homophones: 7
   preedit_format:
     - "xlit|1qaz2wsxedcrfv5tgbyhnujm8ik,9ol.0p;/- 6347|ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄧㄨㄩㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦˉˊˇˋ˙|"
     - "xform/\\\\/ /"

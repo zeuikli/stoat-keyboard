@@ -13,6 +13,7 @@ import_tables:
   - terra_pinyin_onion
   - terra_pinyin_onion_add
   - mixin_bpmf  #內嵌注音文，混打。
+  - phrases.chtp  #擴充詞庫（81 萬詞組，對齊 onionplus 完整度，§128）
 ...
 ##### 測試字（測試是否少掉台灣以外的用字） #####
 #裏面	li3 mian4

@@ -32,20 +32,12 @@ switches:
   - name: prediction
     reset: 1
     states: [ 關閉預測, 開啓預測 ]
-  - name: emoji
-    reset: 1
-    states: [ 關閉表情, 開啓表情 ]
-  - name: kaomoji
-    reset: 0
-    states: [ 關閉顏文字, 開啓顏文字 ]
 
 engine:
   filters:
 #     - charset_filter@big5
 #     - charset_filter@gbk
     - simplifier@zh_cn
-    - simplifier@emoji
-    - simplifier@kaomoji
     - reverse_lookup_filter@bpm_reverse_lookup
     - uniquifier
   processors:
@@ -74,18 +66,6 @@ engine:
 zh_cn:
   opencc_config: tw2s.json
   tips: all
-  tags: [ abc ]
-
-emoji:                           # 表情候選（§68）；option_name 綁 emoji switch
-  opencc_config: emoji_t.json
-  option_name: emoji
-  tips: none
-  tags: [ abc ]
-
-kaomoji:                         # 顏文字候選（§69）；綁 kaomoji switch
-  opencc_config: kaomoji_t.json
-  option_name: kaomoji
-  tips: none
   tags: [ abc ]
 
 # big5:
@@ -182,8 +162,6 @@ speller:
     - xform|^＊([ZCSrzcsiuvaoeEAIOUMNKGR])$|$1 | #\x31=數字1
     - xform|^＊＊|| #開頭「＊＊」使注音文不被前面縮略，該正則回復
 ##########注音聲韻母亂序##########
-    # 聲母 ↔ (介音+韻母) 對調，接受亂序鍵入；derive 保留原序故正常輸入不變（§67）
-    - derive/^([bpmfdtnlgkhjqxZCSrzcs])([iuvaoeEAIOUMNKGR]+)([12345])$/$2$1$3/
     - 'xlit|bpmfdtnlgkhjqxZCSrzcsiuvaoeEAIOUMNKGR12345|1qaz2wsxedcrfv5tgbyhnujm8ik,9ol.0p;/- 6347|'
 ################################### 主翻譯器 ###################################
 translator:
@@ -192,9 +170,6 @@ translator:
   # enable_charset_filter: false
   enable_completion: false #新版有長詞補全，用此關閉
   enable_user_dict: true
-  contextual_suggestions: true   # octagram 文法重排候選（選字聰明度，§75）
-  max_homophones: 7              # 長句容許更多同音候選參與文法評分
-  max_homographs: 7
   # initial_quality: 0
   preedit_format:
     - "xlit|1qaz2wsxedcrfv5tgbyhnujm8ik,9ol.0p;/- 6347|ㄅㄆㄇㄈㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㄓㄔㄕㄖㄗㄘㄙㄧㄨㄩㄚㄛㄜㄝㄞㄟㄠㄡㄢㄣㄤㄥㄦˉˊˇˋ˙|"
@@ -571,4 +546,4 @@ predictor:
   max_candidates: 5
   max_iterations: 1
 grammar:
-  language: zh-hant-t-essay-bgw
+  language: zh-hant-t-essay-bgc
