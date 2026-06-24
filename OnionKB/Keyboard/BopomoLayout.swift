@@ -80,12 +80,17 @@ enum BopomoLayout {
         ["。", "，", "、", "？", "！"],
     ]
 
-    /// 無組字時的常用符號 + 顏文字快捷列（§35 #1）。
-    static let quickSymbols: [String] = [
+    /// 無組字時 idle 快捷列——標點段（§35 #1 / §121，⚙ 可關）。
+    static let quickPunct: [String] = [
         "，", "。", "、", "！", "？", "：", "；", "…", "～", "—",
         "「」", "（）", "【】", "《》",
+    ]
+    /// 無組字時 idle 快捷列——顏文字段（§121，⚙ 可關）。
+    static let quickKaomoji: [String] = [
         "(´・ω・`)", "(・∀・)", "(＾▽＾)", "^_^", "orz", "Q_Q", "ʕ•ᴥ•ʔ", "(ㆆ_ㆆ)",
     ]
+    /// 兩段合併（兼容他處引用）。
+    static let quickSymbols: [String] = quickPunct + quickKaomoji
 
     static let keySpace: Int32 = 0x20
     static let keyBackspace: Int32 = 0xff08   // XK_BackSpace

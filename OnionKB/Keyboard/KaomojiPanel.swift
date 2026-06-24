@@ -59,6 +59,7 @@ final class KaomojiPanel: UIView, UICollectionViewDataSource, UICollectionViewDe
         del.setContentHuggingPriority(.required, for: .horizontal)
         let delLP = UILongPressGestureRecognizer(target: self, action: #selector(deleteRepeat(_:)))
         delLP.minimumPressDuration = 0.35
+        delLP.delaysTouchesEnded = false                   // ⌫ tap 立即生效（§112）
         del.addGestureRecognizer(delLP)
 
         let bottom = UIStackView(arrangedSubviews: [abc, chipScroll, del])

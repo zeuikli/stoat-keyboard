@@ -7,6 +7,7 @@ final class ClosureSwipe: UISwipeGestureRecognizer {
         self.handler = handler
         super.init(target: nil, action: nil)
         self.direction = direction
+        delaysTouchesEnded = false   // tap 立即生效、不等 swipe 判失敗（§112 修卡頓/按不準）
         addTarget(self, action: #selector(fire))
     }
     @objc private func fire() { handler() }
@@ -16,7 +17,8 @@ final class ClosureSwipe: UISwipeGestureRecognizer {
 /// `pressedColor == nil` → 不手動高亮（交給 iOS 26 glass 互動動畫或系統）。
 final class KeyButton: UIButton {
     var restingColor: UIColor? = KBColor.contentKey
-    var pressedColor: UIColor? = .systemGray4
+    // 淺：白鍵壓暗 systemGray4；深：systemGray4 鍵壓亮 systemGray3（深色也有按壓回饋，§108）
+    var pressedColor: UIColor? = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray3.resolvedColor(with: $0) : UIColor.systemGray4.resolvedColor(with: $0) }
     override var isHighlighted: Bool {
         didSet {
             guard oldValue != isHighlighted, let pressed = pressedColor else { return }
@@ -37,14 +39,12 @@ enum KBColor {
     /// 鍵盤底（原廠 iOS 26 精確量測，§102）：淺 #E2E4E8 / 深 #171717
     static let panel = dyn(UIColor(red: 226/255, green: 228/255, blue: 232/255, alpha: 1),
                            UIColor(red: 23/255, green: 23/255, blue: 23/255, alpha: 1))
-    /// 內容鍵（白 / #3D3D3D）
-    static let contentKey = dyn(.white,
-                                UIColor(red: 61/255, green: 61/255, blue: 61/255, alpha: 1))
-    /// 功能鍵：iOS 26 與內容鍵同色（無灰功能鍵，§102）
-    static let funcKey = contentKey
-    /// 功能鍵按下（暗一階）
-    static let funcKeyPressed = dyn(UIColor(red: 209/255, green: 211/255, blue: 215/255, alpha: 1),
-                                    UIColor(red: 94/255, green: 94/255, blue: 94/255, alpha: 1))
+    /// 內容鍵：淺＝白；深＝官方語意灰 systemGray4（SDK 深色鍵色，§108）
+    static let contentKey = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray4.resolvedColor(with: $0) : .white }
+    /// 功能鍵：淺＝白；深＝systemGray5（比 content 暗一階，§108）
+    static let funcKey = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray5.resolvedColor(with: $0) : .white }
+    /// 功能鍵按下：淺＝systemGray4(白鍵壓暗)；深＝systemGray3(暗鍵壓亮)，兩模式都有回饋（§108）
+    static let funcKeyPressed = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray3.resolvedColor(with: $0) : UIColor.systemGray4.resolvedColor(with: $0) }
 }
 
 /// 注音鍵盤主控制器（SPEC §7.2 / §15.3 / §24 / §27）。
@@ -63,6 +63,7 @@ final class KeyboardViewController: UIInputViewController {
     private var bopomoKeys: [(key: BopomoLayout.Key, main: UIButton, eng: UILabel)] = []
     private var cnEnButton: UIButton?                                // 中/英 快切鍵
     private var shiftButton: UIButton?                              // ⇧（保留供 updateModeStyling，已無實體鍵）
+    private weak var returnButton: UIButton?                         // return 鍵（依 hasText 切灰↔藍，§109）
     private var heightConstraint: NSLayoutConstraint?
     private var kaomojiPanel: KaomojiPanel?                         // 顏文字面板（§36 #3）
     private var keyRowsStack: UIStackView!                          // 鍵列容器（模式切換，§44/§46）
@@ -70,6 +71,7 @@ final class KeyboardViewController: UIInputViewController {
     private let expandButton = UIButton(type: .system)             // 候選展開/收合 chevron（§89）
     private var expandedPanel: UIScrollView?                       // 展開候選格面板（§89）
     private var isExpanded = false
+    private let kbBackdrop = UIInputView(frame: .zero, inputViewStyle: .keyboard)   // 官方系統鍵盤底材（§105 native 方式）
     // 真 Liquid Glass 層（§97，官方 UIGlassContainerEffect 容器 + 巢狀 glass）
     private var glassContainer: UIVisualEffectView?
     private var glassKeyButtons: [(button: UIButton, prominent: Bool)] = []   // 本輪 rebuild 登記的玻璃鍵
@@ -95,7 +97,15 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = KBColor.panel   // 原廠 opaque #E2E4E8/#171717（§102）
+        view.backgroundColor = .clear                               // 底改由系統鍵盤底材提供（§105 native 方式）
+        kbBackdrop.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(kbBackdrop)                                 // 系統鍵盤底材：同原廠材質、自動深淺/半透、填滿整框
+        NSLayoutConstraint.activate([
+            kbBackdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            kbBackdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            kbBackdrop.topAnchor.constraint(equalTo: view.topAnchor),
+            kbBackdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
         if isOS26 {                                                  // 上緣圓角僅 iOS 26（§94）；16–18 方正貼原廠
             view.layer.cornerRadius = 26                             // 原廠量測 ~26pt 視覺（§102）
             view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
@@ -104,19 +114,46 @@ final class KeyboardViewController: UIInputViewController {
         }
         buildUI()
         applyOptionDefaults()   // 套用容器 App 設定的選項預設（§27 #1）
+        if #available(iOS 17.0, *) {   // trait 變更（深淺）即重套外觀，避免切 App 殘留白底（§111）
+            registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (vc: KeyboardViewController, _) in
+                vc.applyKeyboardAppearance()
+                vc.styleReturnKey()
+            }
+        }
+        // App 回前景：viewWillAppear/viewIsAppearing 在 suspend→resume 不會 fire（§118 缺口、研究 §124 Q4 證實）；
+        // 掛前景通知，在轉場「完成後」乾淨重套高度（非動畫），吃掉系統 snapshot→live 還原殘留的偶發彈跳。
+        NotificationCenter.default.addObserver(self, selector: #selector(appWillEnterForeground),
+                                               name: UIApplication.willEnterForegroundNotification, object: nil)
+    }
+
+    @objc private func appWillEnterForeground() {
+        // 轉場後校正：壓系統高度約束 + 套自訂高度，全程非動畫（不疊加自家彈跳，§120/§124）。
+        UIView.performWithoutAnimation {
+            relaxEncapsulatedHeight()
+            applyHeight()
+            view.layoutIfNeeded()
+        }
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         applyKeyboardAppearance()   // 跟隨 App 要求的鍵盤深淺（§99，如 Telegram 深色）
-        // 每次鍵盤出現重套 App 設定（簡繁/全形/標點 + glass/字體/提示）——拾取改設定後的最新值（需 Full Access，§63）
+        // 重套引擎選項（簡繁/全形/標點，§63）；不重建按鍵——切 App 重建會閃動/變形（§113）。
+        // 鍵已在 viewDidLoad 建好；⚙ 選單改設定時自呼 rebuildKeyRows。
         applyOptionDefaults()
-        rebuildKeyRows()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // 過渡完成後只校正外觀/return（§111）；高度不在此重套（§125：轉場交系統、約束已持續存在）。
+        applyKeyboardAppearance()
+        styleReturnKey()
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
         applyKeyboardAppearance()   // App 切換/聚焦時深淺可能變
+        styleReturnKey()            // 有無文字變動→ return 灰↔藍即時更新（§109）
     }
 
     /// 依 App 要求的 keyboardAppearance 覆寫深淺；.default → 跟系統（§99）。
@@ -130,9 +167,31 @@ final class KeyboardViewController: UIInputViewController {
         if overrideUserInterfaceStyle != style { overrideUserInterfaceStyle = style }
     }
 
+    override func viewIsAppearing(_ animated: Bool) {
+        super.viewIsAppearing(animated)
+        // 外觀過渡中、畫面尚未可見時就壓好高度約束（§115）+ 無動畫定版（§116）：
+        // 可見時已是最終高度/按鍵位置，無待動畫差異 → 不會被看到跳動。
+        relaxEncapsulatedHeight()
+        applyHeight()
+        UIView.performWithoutAnimation { view.layoutIfNeeded() }
+    }
+
     override func viewWillLayoutSubviews() {
         super.viewWillLayoutSubviews()
-        applyHeight()
+        // 轉場交給系統、我方不重繪（§125）：高度約束建立後持續存在，h 沒變時不需每 pass 重套（移除 applyHeight）。
+        // 唯一必要＝relax 系統重新注入的 encapsulated 約束（idempotent，guard priority>998 只在新注入時動一次），
+        // 否則被壓扁變形（§114）。包 performWithoutAnimation 確保此修正不被外層轉場動畫接管（§120）。
+        UIView.performWithoutAnimation {
+            relaxEncapsulatedHeight()
+        }
+    }
+
+    /// iOS 呈現/切 App 時加入私有 required 約束 `UIView-Encapsulated-Layout-Height`（系統預設高 ~228）
+    /// → 壓過自訂 @999 高度 → 高度 snap + 鍵被壓扁變形。降其優先序讓自訂高度恆勝（§114）。
+    private func relaxEncapsulatedHeight() {
+        for c in view.constraints where c.identifier == "UIView-Encapsulated-Layout-Height" {
+            if c.priority.rawValue > 998 { c.priority = UILayoutPriority(998) }
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -151,7 +210,7 @@ final class KeyboardViewController: UIInputViewController {
         // 由注音反推固定鍵高 → 各模式套同一 rowH，按鍵大小一致
         let rowH = max(38, (KBSettings.keyboardHeight - bopomoChrome - (refRows - 1) * rowGap) / refRows)
         let curRows = CGFloat(max(1, keyRowsStack.arrangedSubviews.count))
-        let chrome = (mode == .bopomo) ? bopomoChrome : baseChrome   // 候選列僅注音顯示
+        let chrome = candidateRowVisible ? bopomoChrome : baseChrome   // 候選列隱藏（英/123 或 idle 全關，§123）→ 不佔高
         let h = chrome + curRows * rowH + (curRows - 1) * rowGap
         if let c = heightConstraint {
             c.constant = h
@@ -173,6 +232,14 @@ final class KeyboardViewController: UIInputViewController {
     private static let glassKey = "kbopt_glass"
     private static let engHintKey = "kbopt_engHint"
     private static let numberRowKey = "kbopt_numberRow"
+    private static let quickPunctKey = "kbopt_quickPunct"       // idle 第一列標點段（§121）
+    private static let quickKaomojiKey = "kbopt_quickKaomoji"   // idle 第一列顏文字段（§121）
+    /// 第一列兩段（標點/顏文字）都關 → idle 時整列空（§123）。
+    private var bothQuickRowsOff: Bool {
+        !localOpt(Self.quickPunctKey, default: true) && !localOpt(Self.quickKaomojiKey, default: true)
+    }
+    /// 候選列當前是否顯示（供 applyHeight 算高度，§123）。
+    private var candidateRowVisible: Bool { candidateRowRef.map { !$0.isHidden } ?? false }
     private var numberSubPage = 0                       // 123 頁子頁（0/1，§66）
     private var showNumberRow: Bool { localOpt(Self.numberRowKey, default: true) }
 
@@ -221,6 +288,9 @@ final class KeyboardViewController: UIInputViewController {
         }
         items.append(toggle("常駐數字列", Self.numberRowKey, localOpt(Self.numberRowKey, default: true)) { [weak self] _ in self?.rebuildKeyRows() })
         items.append(toggle("注音鍵英文提示", Self.engHintKey, localOpt(Self.engHintKey)) { [weak self] _ in self?.rebuildKeyRows() })
+        // idle 第一列：標點 / 顏文字各自開關（§121）
+        items.append(toggle("第一列標點", Self.quickPunctKey, localOpt(Self.quickPunctKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
+        items.append(toggle("第一列顏文字", Self.quickKaomojiKey, localOpt(Self.quickKaomojiKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         // 123 標點：自動依中英 / 半形 / 全形（§82）
         let cur = localStore.integer(forKey: Self.n123ModeKey)
         func p123(_ title: String, _ v: Int) -> UIAction {
@@ -387,7 +457,7 @@ final class KeyboardViewController: UIInputViewController {
             }
             keyRowsStack.addArrangedSubview(bopomoFunctionRow())
         }
-        candidateRowRef?.isHidden = (mode != .bopomo)   // 英文/123 收候選列→去上方留白（§86）
+        updateCandidateRowVisibility()   // 英文/123 收候選列（§86）；注音 idle 全關亦收（§123）
         if mode == .english { refreshEnglishCase() } else { updateModeStyling() }
         applyHeight()                                   // 列數變動即更新高度（§90 原廠風格變動高度）
         if #available(iOS 26.0, *), Self.realGlass { buildGlassLayer() }   // §97 官方玻璃容器
@@ -483,7 +553,7 @@ final class KeyboardViewController: UIInputViewController {
         let num = grayKey(keyButton(title: "123") { [weak self] in self?.setMode(.numbers) })
         let emoji = grayKey(keyButton(title: "😀") { [weak self] in self?.showKaomojiPanel() })
         let space = wideSpaceKey()
-        let ret = grayKey(iconButton("return") { [weak self] in self?.tapEnter() })
+        let ret = returnKey()
         let keys = [zh, num, emoji, space, ret]
         return widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: zh)
     }
@@ -515,8 +585,15 @@ final class KeyboardViewController: UIInputViewController {
             glassKeyButtons.append((b, prominent))
             return
         }
-        let rest = UIColor.white.withAlphaComponent(prominent ? 0.55 : 0.30)   // §92 霜白（主版）：content 較實、function 較透
-        let press = UIColor.white.withAlphaComponent(prominent ? 0.85 : 0.60)
+        // 霜白：淺色用高白 alpha（疊淺底→淺鍵）；深色用低白 alpha（疊深底→只微亮、不過曝，§106）
+        let rest = UIColor { tc in
+            let a: CGFloat = tc.userInterfaceStyle == .dark ? (prominent ? 0.20 : 0.12) : (prominent ? 0.55 : 0.30)
+            return UIColor.white.withAlphaComponent(a)
+        }
+        let press = UIColor { tc in
+            let a: CGFloat = tc.userInterfaceStyle == .dark ? (prominent ? 0.34 : 0.24) : (prominent ? 0.85 : 0.60)
+            return UIColor.white.withAlphaComponent(a)
+        }
         b.backgroundColor = rest
         if let k = b as? KeyButton { k.restingColor = rest; k.pressedColor = press }
     }
@@ -582,6 +659,43 @@ final class KeyboardViewController: UIInputViewController {
         return b
     }
 
+    /// return 鍵（§107/§109）：依 returnKeyType + enablesReturnKeyAutomatically + hasText 即時上色。
+    private func returnKey() -> UIButton {
+        let b = iconButton("return") { [weak self] in self?.tapEnter() }
+        returnButton = b
+        styleReturnKey()
+        return b
+    }
+
+    /// 依 proxy 狀態套 return 鍵樣式（§109）：停用→灰淡；動作型→藍；預設→灰。打字後由 textDidChange 重套。
+    private func styleReturnKey() {
+        guard let b = returnButton, let k = b as? KeyButton else { return }
+        let proxy = textDocumentProxy
+        let isAction = (proxy.returnKeyType ?? .default) != .default      // nil→default（灰）；§110
+        let hasContent = proxy.hasText || !isPreeditEmpty                 // 已上字 OR 組字中
+        // enablesReturnKeyAutomatically proxy 不轉發（§110）→ 對動作欄位近似：空白即停用
+        let disabled = isAction && !hasContent
+        if disabled {
+            b.isEnabled = false
+            b.tintColor = .tertiaryLabel                 // → 淡化
+            k.restingColor = Self.funcKeyGray
+            k.pressedColor = nil
+            b.backgroundColor = Self.funcKeyGray
+        } else if isAction {                              // 動作型（.go/.send/.next…）有內容→ 藍
+            b.isEnabled = true
+            b.tintColor = .white
+            k.restingColor = .systemBlue
+            k.pressedColor = UIColor.systemBlue.withAlphaComponent(0.7)
+            b.backgroundColor = .systemBlue
+        } else {                                          // 一般換行 → 灰
+            b.isEnabled = true
+            b.tintColor = .label
+            k.restingColor = Self.funcKeyGray
+            k.pressedColor = KBColor.funcKeyPressed
+            b.backgroundColor = Self.funcKeyGray
+        }
+    }
+
     /// 常駐數字列鍵（§45）：1-0 + 角落符號小標 + 上划輸入符號（§35 #2）。列佈局由呼叫端決定（注音用 uniformRow、英文用 makeKeyRow，§78）。
     private func numberRowKeys() -> [UIButton] {
         let digits = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]
@@ -610,7 +724,7 @@ final class KeyboardViewController: UIInputViewController {
         let cnEn = grayKey(keyButton(title: "英") { [weak self] in self?.setMode(.english) })  // 切英文 QWERTY
         let emoji = grayKey(keyButton(title: "😀") { [weak self] in self?.showKaomojiPanel() })
         let space = wideSpaceKey()
-        let ret = grayKey(iconButton("return") { [weak self] in self?.tapEnter() })
+        let ret = returnKey()
         let keys = withGlobe([num, cnEn, emoji, space, ret])
         return widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num)
     }
@@ -621,7 +735,7 @@ final class KeyboardViewController: UIInputViewController {
         let back = grayKey(keyButton(title: backTitle) { [weak self] in self?.setMode(self?.lastLetterMode ?? .bopomo) })
         let emoji = grayKey(keyButton(title: "😀") { [weak self] in self?.showKaomojiPanel() })
         let space = wideSpaceKey()
-        let ret = grayKey(iconButton("return") { [weak self] in self?.tapEnter() })
+        let ret = returnKey()
         let keys = withGlobe([back, emoji, space, ret])
         return widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: back)
     }
@@ -630,6 +744,7 @@ final class KeyboardViewController: UIInputViewController {
         let space = keyButton(title: "空格") { [weak self] in self?.tapSpace() }
         let lp = UILongPressGestureRecognizer(target: self, action: #selector(spaceLongPress(_:)))
         lp.minimumPressDuration = 0.3
+        lp.delaysTouchesEnded = false                      // 空格 tap 立即生效（§112）
         space.addGestureRecognizer(lp)                     // 長按滑動移游標（§39）
         return space
     }
@@ -844,6 +959,7 @@ final class KeyboardViewController: UIInputViewController {
         let b = grayKey(iconButton("delete.left") { [weak self] in self?.tapBackspace() })
         let lp = UILongPressGestureRecognizer(target: self, action: #selector(backspaceLongPress(_:)))
         lp.minimumPressDuration = 0.35
+        lp.delaysTouchesEnded = false                      // ⌫ tap 立即生效（§112）
         b.addGestureRecognizer(lp)
         return b
     }
@@ -882,10 +998,13 @@ final class KeyboardViewController: UIInputViewController {
     private func refresh(_ update: RimeUpdate) {
         currentCandidates = update.candidates
         compositionLabel.text = update.preedit.isEmpty ? " " : update.preedit
+        styleReturnKey()                                         // 組字/清空→ return 灰↔藍即時更新（§110）
         candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         if update.candidates.isEmpty && update.preedit.isEmpty {
             if isExpanded { collapseExpanded() }                 // 組字清空→自動收合展開面板（§89）
             showQuickSymbols()                                   // 無組字→常用符號/顏文字（§35 #1）
+            updateCandidateRowVisibility()                       // 第一列兩段全關→收整列、騰回高度（§123）
+            applyHeight()
             return
         }
         for (i, cand) in update.candidates.enumerated() {
@@ -899,6 +1018,8 @@ final class KeyboardViewController: UIInputViewController {
             }, for: .touchUpInside)
             candidateStack.addArrangedSubview(b)
         }
+        updateCandidateRowVisibility()                           // 有候選/組字→候選列必顯（§123）
+        applyHeight()
     }
 
     // MARK: - 候選展開面板（§89，比照原廠格狀展開）
@@ -1015,9 +1136,12 @@ final class KeyboardViewController: UIInputViewController {
         return true
     }
 
-    /// 無組字時的常用符號快捷列（點即插，§35 #1）。表情/顏文字改由功能列 😀 開面板（§37）。
+    /// 無組字時的 idle 快捷列（點即插，§35 #1）。標點/顏文字兩段各由 ⚙ 開關（§121），皆預設開。
     private func showQuickSymbols() {
-        for sym in BopomoLayout.quickSymbols {
+        var syms: [String] = []
+        if localOpt(Self.quickPunctKey, default: true) { syms += BopomoLayout.quickPunct }
+        if localOpt(Self.quickKaomojiKey, default: true) { syms += BopomoLayout.quickKaomoji }
+        for sym in syms {
             let b = UIButton(type: .system)
             b.setTitle(sym, for: .normal)
             b.titleLabel?.font = .systemFont(ofSize: 19 * fontScale)
@@ -1025,6 +1149,23 @@ final class KeyboardViewController: UIInputViewController {
             b.addAction(UIAction { [weak self] _ in self?.textDocumentProxy.insertText(sym) }, for: .touchUpInside)
             candidateStack.addArrangedSubview(b)
         }
+    }
+
+    /// ⚙ 切換 idle 快捷列開關後即時重繪（僅在無組字/無候選時，§121）。
+    private func refreshIdleQuickRow() {
+        guard mode == .bopomo, currentCandidates.isEmpty, isPreeditEmpty, !isExpanded else { return }
+        candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        showQuickSymbols()
+        updateCandidateRowVisibility()   // 兩段全關→收整列、騰回高度（§123）
+        applyHeight()
+    }
+
+    /// 候選列顯示與否（§86 + §123）：非注音模式恆隱；注音模式下 idle 且第一列兩段全關時亦隱（去空列），
+    /// 有候選/組字時必顯（打字要看候選）。
+    private func updateCandidateRowVisibility() {
+        guard mode == .bopomo else { candidateRowRef?.isHidden = true; return }
+        let idle = currentCandidates.isEmpty && isPreeditEmpty
+        candidateRowRef?.isHidden = idle && bothQuickRowsOff
     }
 
     // MARK: - 顏文字面板（§36 #3）

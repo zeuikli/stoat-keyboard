@@ -5,27 +5,14 @@ import SwiftUI
 struct ContentView: View {
     @State private var keyboardHeight = KBSettings.keyboardHeight
     @State private var fontScale = KBSettings.keyFontScale
-    @State private var bopomoEngHint = KBSettings.bopomoEngHint
-    @State private var glassKeys = KBSettings.glassKeys
-    @State private var options: [SchemaOption: Bool] = Dictionary(
-        uniqueKeysWithValues: SchemaOption.allCases.map { ($0, KBSettings.optionDefault($0)) })
 
     var body: some View {
         NavigationStack {
             List {
                 Section("輸入選項") {
-                    ForEach(SchemaOption.allCases.filter { $0 != .asciiMode }, id: \.self) { opt in  // 預設英文模式無效（只改引擎不切版面）→ 移除（§92）
-                        Toggle(opt.title, isOn: Binding(
-                            get: { options[opt] ?? false },
-                            set: { options[opt] = $0; KBSettings.setOptionDefault(opt, $0) }))
-                    }
-                    Toggle("注音鍵顯示英文提示", isOn: $bopomoEngHint)
-                        .onChange(of: bopomoEngHint) { KBSettings.bopomoEngHint = $0 }
-                    Toggle("iOS 26 玻璃按鍵（Liquid Glass）", isOn: $glassKeys)
-                        .onChange(of: glassKeys) { KBSettings.glassKeys = $0 }
-                    Text("預設關（原廠實心白鍵 + 灰功能鍵）。實驗性：部分裝置玻璃會偏色，建議維持關閉").font(.footnote).foregroundStyle(.secondary)
-                    Text("關閉＝純原廠版面；注音鍵上下划輸入英文（大千＝QWERTY 鍵位）不受此開關影響").font(.footnote).foregroundStyle(.secondary)
-                    Text("鍵盤上保留「中/英」鍵可隨時快切；其餘於此設定").font(.footnote).foregroundStyle(.secondary)
+                    Label("請用鍵盤右上角的 ⚙ 選單調整", systemImage: "slider.horizontal.3")
+                    Text("簡繁、全/半形、標點、表情/顏文字候選、注音英文提示、iOS 26 玻璃按鍵等，都在鍵盤上的 ⚙ 內即時切換。").font(.footnote).foregroundStyle(.secondary)
+                    Text("側載安裝下 App 與鍵盤是不同沙盒、無法同步設定（App Group 重簽後失效），故統一由鍵盤 ⚙ 控制——這裡不再放重複開關以免誤會。").font(.footnote).foregroundStyle(.secondary)
                 }
                 Section("鍵盤高度") {
                     Slider(value: $keyboardHeight,
