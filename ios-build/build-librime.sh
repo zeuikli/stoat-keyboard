@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build-librime.sh — 用完整 librime 1.16.1 源 + iOS deps 交叉編譯 librime 靜態庫，
+# build-librime.sh — 用完整 librime 1.17.0 源 + iOS deps 交叉編譯 librime 靜態庫，
 # 組裝 librime.xcframework（device arm64 + simulator arm64）。SPEC §22.3。
 set -euo pipefail
 export PATH="/opt/homebrew/bin:$PATH"
