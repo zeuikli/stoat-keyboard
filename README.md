@@ -69,8 +69,7 @@ rimeless/
 ├─ RimeData/
 │  ├─ shared/            #   schema / 詞庫源（bopomo_onion.schema.yaml…）
 │  └─ build/             #   預編譯 .bin（prism / table / reverse）
-├─ ios-build/            # librime.xcframework 建置（含 selftest）
-└─ SPEC-iOS.md           # 實作日誌與決策真相來源（§1–§91）
+└─ ios-build/            # librime.xcframework 建置（含 selftest）
 ```
 
 **資料流**：大千鍵 → keycode → `RimeBridge` → librime → 組字／候選／上字 → UI。
