@@ -101,10 +101,11 @@ bash Scripts/package-ipa.sh        # 產出 build/ipa/OnionKB.ipa
 ## 文件
 
 - **`CHANGELOG.md`** — 由動工到最新版的時序紀錄，每里程碑附 Debug／設計 Insight。
-- **`SPEC-iOS.md`** — 完整實作日誌與架構決策（真相來源）。
 
 ---
 
 ## 授權
 
-移植自 RIME / librime / Squirrel 生態與洋蔥詞庫；散佈前須處理對應授權（見 `SPEC-iOS.md` §11 授權紅線）。
+- **本專案原創程式碼**（`OnionKB/` 下的 Swift App 與鍵盤 extension）依 **GNU GPL-3.0** 釋出，全文見 [`LICENSE`](LICENSE)。
+- 本倉庫散佈時包含 **librime（BSD-3-Clause）**、RIME 語言資料/模型、洋蔥純注音詞庫等第三方元件，各有其自身授權——清單、出處與散佈前檢查見 [`NOTICE`](NOTICE)。
+- 公開散佈前請務必依 `NOTICE` 核實各上游授權；標 ⚠ 者尤需確認。

@@ -1,0 +1,58 @@
+Stoat (白鼬注音)
+================
+
+Copyright (C) 2026 Stoat (白鼬注音) authors.
+
+This program (the original Swift application and keyboard-extension source
+code under OnionKB/) is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License version 3 as published
+by the Free Software Foundation. See the LICENSE file for the full text.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+  > 動作項：請把上方 "Stoat (白鼬注音) authors" 換成你的姓名/帳號。
+
+
+Third-party components 第三方元件
+--------------------------------
+
+本倉庫散佈時包含下列第三方元件，各有其自身授權；散佈前請逐一核對並遵循。
+下列授權標示為「整理起點」，最終以各上游專案 LICENSE 為準（標 ⚠ 者尤需確認）。
+
+1. librime  （編譯為 ios-build/out/librime.xcframework）
+   - 來源：https://github.com/rime/librime
+   - 授權：BSD 3-Clause License
+   - 說明：RIME 輸入法引擎核心。本倉庫收錄的是預編譯靜態庫（librime_full.a）。
+
+2. librime 外掛（編入上述 xcframework）
+   - librime-lua    https://github.com/hchunhui/librime-lua        ⚠ 授權待確認
+   - librime-octagram                                              ⚠ 授權待確認
+   - librime-predict                                               ⚠ 授權待確認
+   - 說明：語法模型（octagram）、Lua 擴充、預測候選。請依各專案授權標示。
+
+3. RIME 語言資料 / 模型（RimeData/shared/）
+   - essay.txt, essay-zh-hant-mc.txt   來源 https://github.com/rime/rime-essay   ⚠ 授權待確認
+   - zh-hant-t-essay-bgw.gram          octagram 語法模型                          ⚠ 授權待確認
+   - default.yaml, key_bindings.yaml   RIME 預設設定衍生                          ⚠ 授權待確認
+   - predict_office.db                 預測詞庫                                   ⚠ 來源/授權待確認
+
+4. 洋蔥純注音詞庫（bopomo_onion.*：schema / dict / phrase）
+   - 來源：洋蔥（Onion）注音方案                                                  ⚠ 授權與出處待確認
+   - 說明：本鍵盤的注音 schema 與詞庫基礎。散佈前務必確認其授權與署名要求。
+
+5. 其他資料
+   - kaomoji.json、han2code.json、bopomo_onion_symbols.yaml 等：若取自外部來源，
+     請補上出處與授權；若為本專案自製，則隨本倉庫 GPL-3.0。
+
+
+散佈前檢查清單（重要）
+----------------------
+- [ ] 確認上方標 ⚠ 的元件授權，補齊各自的 LICENSE / 出處 / 署名。
+- [ ] 確認所有 bundled 資料的授權與 GPL-3.0 相容（若有 GPL 元件，整體散佈須 GPL）。
+- [ ] 若不想散佈預編譯 librime 二進位（ios-build/out/*.a，約 28MB），改放 Releases 或
+      由使用者自行依 ios-build/ 流程建置。
+- [ ] 把本檔與 LICENSE 一併保留於散佈物中。
+
+本檔為授權整理的起點，非法律意見；正式公開散佈前建議自行核實各上游授權條款。
