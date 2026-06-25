@@ -118,7 +118,7 @@ final class KeyboardViewController: UIInputViewController {
                 kbBackdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             ])
         }
-        if isOS26 && !Self.flatStyleIOS18 {                          // 上緣圓角僅 iOS 26（§94）；iOS18 變體方正貼原廠
+        if isOS26 {                                                  // §146 上緣圓角＝iOS 26 系統需要的圓角 → 以系統為優先（iOS18 變體也保留，僅「鍵」改 iOS18 風格）
             view.layer.cornerRadius = 26                             // 原廠量測 ~26pt 視覺（§102）
             view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
             view.layer.cornerCurve = .continuous
