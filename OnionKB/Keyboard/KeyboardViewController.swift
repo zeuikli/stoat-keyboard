@@ -690,10 +690,11 @@ final class KeyboardViewController: UIInputViewController {
             // §145：tint=nil（官方）在「純色底」會讓鍵消失（玻璃無 App 內容可折射）→ 必須染色才可見。
             // 用 SDK 官方語意色當 tint，對齊非玻璃：深色 systemGray2(內容)/Gray3(功能)、淺色白；高 alpha 確保可見。
             let dark = traitCollection.userInterfaceStyle == .dark
+            // 內容鍵=白(淺)/systemGray2(深)；功能鍵=systemGray2(淺灰)/systemGray3(深)。高 alpha→中性鍵色、不被 App 底色透染。
             let base: UIColor = dark
                 ? (prominent ? UIColor.systemGray2 : UIColor.systemGray3).resolvedColor(with: traitCollection)
-                : .white
-            e.tintColor = glassTintColor ?? base.withAlphaComponent(dark ? 0.92 : 0.55)
+                : (prominent ? .white : UIColor.systemGray2.resolvedColor(with: traitCollection))
+            e.tintColor = glassTintColor ?? base.withAlphaComponent(0.92)
             let g = UIVisualEffectView(effect: e)
             g.isUserInteractionEnabled = false
             g.layer.cornerRadius = Self.keyRadius
