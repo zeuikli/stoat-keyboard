@@ -7,7 +7,7 @@
 set -euo pipefail
 V="${1:-full}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-SRC="$ROOT/RimeData/build-$V"
+SRC="$ROOT/RimeData-variants/build-$V"
 DST="$ROOT/RimeData/build"
 [ -d "$SRC" ] || { echo "未知變體：'$V'（需 full 或 lite）" >&2; exit 1; }
 rm -rf "$DST"; cp -R "$SRC" "$DST"
