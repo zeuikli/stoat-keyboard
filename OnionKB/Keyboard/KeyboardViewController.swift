@@ -825,7 +825,7 @@ final class KeyboardViewController: UIInputViewController {
         let b = KeyButton(frame: .zero)         // 必用 designated init：UIButton(type:) 工廠會忽略子類（§57）
         b.setContentCompressionResistancePriority(.defaultLow, for: .vertical)   // 高度不足時鍵自縮、不撐爆（§58）
         b.setTitle(title, for: .normal)
-        b.titleLabel?.font = .systemFont(ofSize: 25 * fontScale)   // 原廠內容鍵大字（§49；§140 對標原廠注音鍵 25pt）
+        b.titleLabel?.font = .systemFont(ofSize: 25 * fontScale, weight: .light)   // §141 所有內容鍵（注音/英文/數字/123）對標原廠：25pt 細筆畫
         b.titleLabel?.numberOfLines = 1                            // 防 123/ABC/#+= 換行（§88）
         b.titleLabel?.adjustsFontSizeToFitWidth = true
         b.titleLabel?.minimumScaleFactor = 0.6
@@ -856,8 +856,7 @@ final class KeyboardViewController: UIInputViewController {
 
     /// 雙標注音鍵：大字注音 + 角落小字英文；上下划輸入英文（§26.2 / §28）。
     private func bopomoKey(_ key: BopomoLayout.Key) -> UIButton {
-        let b = keyButton(title: key.symbol) { [weak self] in self?.tapBopomo(key) }
-        b.titleLabel?.font = .systemFont(ofSize: 25 * fontScale, weight: .light)   // §141 注音字形對標原廠：細筆畫（原 regular 偏粗）
+        let b = keyButton(title: key.symbol) { [weak self] in self?.tapBopomo(key) }   // 字體沿用 keyButton .light（§141）
         let eng = UILabel()
         eng.text = key.englishLabel
         eng.font = .systemFont(ofSize: 10 * fontScale, weight: .medium)
