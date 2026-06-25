@@ -118,6 +118,7 @@ final class KeyboardViewController: UIInputViewController {
             registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (vc: KeyboardViewController, _) in
                 vc.applyKeyboardAppearance()
                 vc.styleReturnKey()
+                if #available(iOS 26.0, *), vc.useGlassKeys { vc.buildGlassLayer() }   // §143 深淺切換重建玻璃→ tint 跟著換
             }
         }
         // App 回前景：viewWillAppear/viewIsAppearing 在 suspend→resume 不會 fire（§118 缺口、研究 §124 Q4 證實）；
@@ -686,7 +687,10 @@ final class KeyboardViewController: UIInputViewController {
         for (btn, prominent) in glassKeyButtons {
             let e = UIGlassEffect(style: localOpt(Self.glassStyleKey) ? .clear : .regular)   // §141 風格：透明/霜面
             e.isInteractive = false                              // 靜態鍵不需互動透鏡（§95）
-            e.tintColor = glassTintColor ?? UIColor.white.withAlphaComponent(prominent ? 0.55 : 0.32)   // §141 色調；無色沿用白底（§96）
+            // §143 深色模式修正：白 tint 在深色背景會把鍵洗亮 → 深色改低白 alpha（鍵呈暗灰、貼近原廠）。
+            let isDark = traitCollection.userInterfaceStyle == .dark
+            let tintAlpha: CGFloat = isDark ? (prominent ? 0.22 : 0.14) : (prominent ? 0.55 : 0.32)
+            e.tintColor = glassTintColor ?? UIColor.white.withAlphaComponent(tintAlpha)   // §141 色調；無色沿用白/深底
             let g = UIVisualEffectView(effect: e)
             g.isUserInteractionEnabled = false
             g.layer.cornerRadius = Self.keyRadius
