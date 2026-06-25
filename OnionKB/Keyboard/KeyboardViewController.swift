@@ -39,9 +39,12 @@ enum KBColor {
     /// 鍵盤底（原廠 iOS 26 精確量測，§102）：淺 #E2E4E8 / 深 #171717
     static let panel = dyn(UIColor(red: 226/255, green: 228/255, blue: 232/255, alpha: 1),
                            UIColor(red: 23/255, green: 23/255, blue: 23/255, alpha: 1))
-    /// §146 iOS 18 扁平實色鍵盤底（經典值）：淺 #D1D4DB / 深 #2C2C2E
-    static let flatBg = dyn(UIColor(red: 209/255, green: 212/255, blue: 219/255, alpha: 1),
-                            UIColor(red: 44/255, green: 44/255, blue: 46/255, alpha: 1))
+    /// §146 iOS 18 扁平實色鍵盤底＝SDK 官方語意色（非手寫 hex）：淺 systemGray4(#D1D1D6) / 深 systemGray5(#2C2C2E)
+    static let flatBg = UIColor { tc in
+        tc.userInterfaceStyle == .dark
+            ? UIColor.systemGray5.resolvedColor(with: tc)
+            : UIColor.systemGray4.resolvedColor(with: tc)
+    }
     /// 內容鍵：淺＝白；深＝官方語意 systemGray2(#636366)（§144 SDK 語意色，原廠深色字鍵）
     static let contentKey = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray2.resolvedColor(with: $0) : .white }
     /// 功能鍵：淺＝systemGray2(#AEAEB2 原廠灰功能鍵)；深＝systemGray3(#48484A)（§145 全語意色；原淺色寫死 .white 不對）
