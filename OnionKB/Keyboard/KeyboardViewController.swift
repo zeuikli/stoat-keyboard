@@ -204,7 +204,7 @@ final class KeyboardViewController: UIInputViewController {
         guard keyRowsStack != nil else { return }
         let rowGap: CGFloat = 7                                       // keyRowsStack spacing（§54）
         // §139 R1 已退回（併列太擠）→ 工具列復為 組字/控制列(26) + 候選列(40) 兩列（§130）。
-        let preeditH: CGFloat = 26, candH: CGFloat = 40
+        let preeditH: CGFloat = 22, candH: CGFloat = 34   // §141 收頂部留空（§130/§133 中間值）：preedit 26→22、候選 40→34
         let baseChrome: CGFloat = 4 + preeditH + 5 + 4               // 上邊距 + 組字/控制列 + rootSpacing + 下邊距
         let bopomoChrome = baseChrome + 2 + candH                    // 注音另含 topBar 內距 + 候選列
         let refRows = CGFloat(showNumberRow ? 6 : 5)                 // 注音參考列數（數字列 + 4 注音 + 功能）
@@ -366,7 +366,7 @@ final class KeyboardViewController: UIInputViewController {
         preeditRow.alignment = .center
         preeditRow.isLayoutMarginsRelativeArrangement = true        // 讓 preedit 內容避開上緣圓角裁切區（§104）
         preeditRow.directionalLayoutMargins = .init(top: 0, leading: 14, bottom: 0, trailing: 10)
-        let preeditH = preeditRow.heightAnchor.constraint(equalToConstant: 26)
+        let preeditH = preeditRow.heightAnchor.constraint(equalToConstant: 22)   // §141 收頂部留空
         preeditH.priority = UILayoutPriority(999)   // 可壓縮：host 高度不足時讓位（§58）
         preeditH.isActive = true
 
@@ -391,7 +391,7 @@ final class KeyboardViewController: UIInputViewController {
         candidateRow.axis = .horizontal
         candidateRow.spacing = 2
         candidateRowRef = candidateRow
-        let candidateH = candidateRow.heightAnchor.constraint(equalToConstant: 40)
+        let candidateH = candidateRow.heightAnchor.constraint(equalToConstant: 34)   // §141 收頂部留空
         candidateH.priority = UILayoutPriority(999)  // 可壓縮：host 高度不足時讓位（§58）
         candidateH.isActive = true
 
@@ -666,11 +666,11 @@ final class KeyboardViewController: UIInputViewController {
 
     /// 功能鍵樣式：iOS 26 + 開關 on → Liquid Glass（regular）；否則灰底 #ABB0BB + 小字 + 原廠按壓高亮。
     private func grayKey(_ b: UIButton) -> UIButton {
+        b.titleLabel?.font = .systemFont(ofSize: 16 * fontScale)   // §141 功能鍵小字（玻璃/非玻璃皆同 → 修玻璃時 123/英 被放大）
         if useGlassKeys, #available(iOS 26.0, *) {
             applyGlass(b, prominent: false)
         } else {
             b.backgroundColor = Self.funcKeyGray
-            b.titleLabel?.font = .systemFont(ofSize: 16 * fontScale)
             if let k = b as? KeyButton {             // 原廠：灰鍵按下變白（§57）
                 k.restingColor = Self.funcKeyGray
                 k.pressedColor = KBColor.funcKeyPressed
@@ -762,6 +762,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func wideSpaceKey() -> UIButton {
         let space = keyButton(title: "空格") { [weak self] in self?.tapSpace() }
+        space.titleLabel?.font = .systemFont(ofSize: 16 * fontScale)   // §141 空格比照原廠：功能鍵小字（非內容鍵 25pt 大字）
         let lp = UILongPressGestureRecognizer(target: self, action: #selector(spaceLongPress(_:)))
         lp.minimumPressDuration = 0.3
         lp.delaysTouchesEnded = false                      // 空格 tap 立即生效（§112）
