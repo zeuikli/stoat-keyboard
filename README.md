@@ -100,16 +100,17 @@ xcodebuild -project OnionKB.xcodeproj -scheme OnionKB \
   ARCHS=arm64 ONLY_ACTIVE_ARCH=YES build
 ```
 
-**選擇詞庫變體（full / lite）**
+**選擇詞庫變體：純注音（lite）/ Plus（full）**
 
-`RimeData/build/` 不入庫，打包前先用 `select-variant.sh` 從 `build-full/`（完整）或 `build-lite/`（輕量）生成：
+本鍵盤提供**兩種詞庫版本，分別打包成獨立 IPA**（不在 App 內即時切換——librime 全域重載會出字異常）。`RimeData/build/` 不入庫，打包前用 `select-variant.sh` 從 `RimeData-variants/build-full/`（Plus）或 `build-lite/`（純注音）生成：
 
-| 變體 | 詞庫 | bundle | 適用 |
-|------|------|--------|------|
-| **full** | 純注音 + 81 萬 phrases.chtp 擴充詞組 | ~80MB | 詞組完整、對齊 Squirrel onionplus |
-| **lite** | 純注音核心（~118K，table.bin 7.5MB）| ~40MB | 輕量、省記憶體 |
+| 變體 | 名稱 | 詞庫 | IPA | 適用 |
+|------|------|------|-----|------|
+| **full** | **Plus** | 純注音 + 81 萬 phrases.chtp 擴充詞組（table.bin 28MB）| ~64MB | 詞組完整、對齊 Squirrel onionplus |
+| **lite** | **純注音** | 純注音核心（~118K，table.bin 7.5MB）| ~48MB | 輕量、省記憶體 |
 
-兩者皆 B 方案（bgc grammar，候選出「為」）+ librime 1.17.0。
+兩者皆 B 方案（bgc grammar，候選出「為」）+ librime 1.17.0，且**表情候選已接線**（打「哈哈哈」候選列出 🤣，schema 掛 `simplifier@emoji`）。
+> 變體 .bin 存於 `RimeData-variants/`（不在 `RimeData/` 內，避免 bundle folder reference 把兩變體都打包進 IPA）。
 
 ```bash
 bash OnionKB/Scripts/select-variant.sh full    # 或 lite
