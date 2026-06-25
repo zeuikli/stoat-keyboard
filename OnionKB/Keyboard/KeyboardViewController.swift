@@ -203,13 +203,15 @@ final class KeyboardViewController: UIInputViewController {
         // 原廠風格變動高度（§90，使用者選）：固定鍵高、總高度隨列數變（注音最高、英文/123 較矮、按鍵全模式同大小）。
         guard keyRowsStack != nil else { return }
         let rowGap: CGFloat = 7                                       // keyRowsStack spacing（§54）
+        // §139 R1 已退回（併列太擠）→ 工具列復為 組字/控制列(26) + 候選列(40) 兩列（§130）。
         let preeditH: CGFloat = 26, candH: CGFloat = 40
-        let baseChrome: CGFloat = 4 + preeditH + 5 + 4               // 上邊距 + preedit + rootSpacing + 下邊距
+        let baseChrome: CGFloat = 4 + preeditH + 5 + 4               // 上邊距 + 組字/控制列 + rootSpacing + 下邊距
         let bopomoChrome = baseChrome + 2 + candH                    // 注音另含 topBar 內距 + 候選列
         let refRows = CGFloat(showNumberRow ? 6 : 5)                 // 注音參考列數（數字列 + 4 注音 + 功能）
         // 由注音反推固定鍵高 → 各模式套同一 rowH，按鍵大小一致
         let rowH = max(38, (KBSettings.keyboardHeight - bopomoChrome - (refRows - 1) * rowGap) / refRows)
-        // §138 #3：123 頁高度對齊英文頁（英文頁列數作基準，鍵列 fillEqually 撐滿）
+        // §138 #3：123 頁高度對齊英文頁。英文頁＝（常駐數字列）+ 3 字母列 + 功能列；123 僅 4 列 → 較矮。
+        // 以英文頁列數作 123 的高度基準，鍵列 fillEqually 自然撐滿，鍵盤外框與英文一致。
         let englishRows = CGFloat((showNumberRow ? 1 : 0) + 3 + 1)
         let curRows = (mode == .numbers)
             ? max(englishRows, CGFloat(keyRowsStack.arrangedSubviews.count))
@@ -234,6 +236,17 @@ final class KeyboardViewController: UIInputViewController {
     private func setLocalOpt(_ key: String, _ v: Bool) { localStore.set(v, forKey: key) }
     private func optKey(_ o: SchemaOption) -> String { "kbopt_" + o.rawValue }
     private static let glassKey = "kbopt_glass"
+    private static let glassStyleKey = "kbopt_glassStyle"   // §141：false=霜面(.regular) / true=透明(.clear)
+    private static let glassTintKey = "kbopt_glassTint"     // §141：0無色 1藍 2灰 3暖
+    /// 玻璃色調（§141）。nil＝無色（沿用白底材質）。
+    private var glassTintColor: UIColor? {
+        switch localStore.integer(forKey: Self.glassTintKey) {
+        case 1: return UIColor.systemBlue.withAlphaComponent(0.25)
+        case 2: return UIColor.systemGray.withAlphaComponent(0.30)
+        case 3: return UIColor(red: 0.96, green: 0.86, blue: 0.70, alpha: 0.28)   // 暖調
+        default: return nil
+        }
+    }
     private static let engHintKey = "kbopt_engHint"
     private static let numberRowKey = "kbopt_numberRow"
     private static let quickPunctKey = "kbopt_quickPunct"       // 第一列標點段顯示（§121）
@@ -275,14 +288,32 @@ final class KeyboardViewController: UIInputViewController {
                 self?.setLocalOpt(key, !on); apply(!on); self?.refreshOptionsMenu()
             }
         }
-        var items: [UIMenuElement] = SchemaOption.allCases.filter { ![.asciiMode, .fullShape, .asciiPunct].contains($0) }.map { opt in  // §138 #1
+        // 移除「全形標點/字元」(fullShape) 與「英式標點」(asciiPunct)（§138 #1）；123 半全形改由「123 標點」子選單控制
+        var items: [UIMenuElement] = SchemaOption.allCases.filter { ![.asciiMode, .fullShape, .asciiPunct].contains($0) }.map { opt in
             toggle(opt.title, optKey(opt), localOpt(optKey(opt), default: opt.defaultOn)) { [weak self] v in
                 self?.engine.setOption(opt.rawValue, v)
                 if opt == .fullShape { self?.rebuildKeyRows() }   // 123 頁半全形即時更新（§71）
             }
         }
         if #available(iOS 26.0, *) {
-            items.append(toggle("iOS 26 玻璃按鍵", Self.glassKey, localOpt(Self.glassKey, default: Self.realGlass)) { [weak self] _ in self?.rebuildKeyRows() })
+            let glassOn = localOpt(Self.glassKey, default: false)
+            items.append(toggle("iOS 26 玻璃按鍵", Self.glassKey, glassOn) { [weak self] _ in self?.rebuildKeyRows(); self?.refreshOptionsMenu() })
+            if glassOn {   // §141：玻璃風格（霜面/透明）+ 色調
+                let clear = localOpt(Self.glassStyleKey)
+                func gstyle(_ t: String, _ v: Bool) -> UIAction {
+                    UIAction(title: t, state: clear == v ? .on : .off) { [weak self] _ in
+                        self?.setLocalOpt(Self.glassStyleKey, v); self?.rebuildKeyRows(); self?.refreshOptionsMenu() }
+                }
+                items.append(UIMenu(title: "玻璃風格", options: .singleSelection,
+                                    children: [gstyle("霜面", false), gstyle("透明", true)]))
+                let tint = localStore.integer(forKey: Self.glassTintKey)
+                func gtint(_ t: String, _ v: Int) -> UIAction {
+                    UIAction(title: t, state: tint == v ? .on : .off) { [weak self] _ in
+                        self?.localStore.set(v, forKey: Self.glassTintKey); self?.rebuildKeyRows(); self?.refreshOptionsMenu() }
+                }
+                items.append(UIMenu(title: "色調", options: .singleSelection,
+                                    children: [gtint("無色", 0), gtint("藍", 1), gtint("灰", 2), gtint("暖", 3)]))
+            }
         }
         items.append(toggle("常駐數字列", Self.numberRowKey, localOpt(Self.numberRowKey, default: true)) { [weak self] _ in self?.rebuildKeyRows() })
         items.append(toggle("注音鍵英文提示", Self.engHintKey, localOpt(Self.engHintKey)) { [weak self] _ in self?.rebuildKeyRows() })
@@ -300,6 +331,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         items.append(UIMenu(title: "123 標點", options: .singleSelection,
                             children: [p123("自動（依中英）", 0), p123("半形", 1), p123("全形", 2)]))
+        // §139：詞庫即時切換出字異常 → 退回；純注音/Plus 為兩個分別打包的版本，不在此切換。
         optionsButton.menu = UIMenu(title: "輸入選項", children: items)
     }
 
@@ -323,6 +355,12 @@ final class KeyboardViewController: UIInputViewController {
         collapseButton.widthAnchor.constraint(equalToConstant: 40).isActive = true
         collapseButton.addAction(UIAction { [weak self] _ in self?.dismissKeyboard() }, for: .touchUpInside)
 
+        expandButton.setImage(UIImage(systemName: "chevron.down"), for: .normal)   // 下拉候選（§89）；§133 移到控制列
+        expandButton.tintColor = .secondaryLabel
+        expandButton.widthAnchor.constraint(equalToConstant: 36).isActive = true
+        expandButton.addAction(UIAction { [weak self] _ in self?.toggleExpanded() }, for: .touchUpInside)
+
+        // 控制列（§130）：組字 + ⚙ + ⌨ 上列（§139 R1 併列太擠 → 退回，候選獨立列）
         let preeditRow = UIStackView(arrangedSubviews: [compositionLabel, optionsButton, collapseButton])
         preeditRow.axis = .horizontal
         preeditRow.alignment = .center
@@ -332,7 +370,7 @@ final class KeyboardViewController: UIInputViewController {
         preeditH.priority = UILayoutPriority(999)   // 可壓縮：host 高度不足時讓位（§58）
         preeditH.isActive = true
 
-        // 候選：獨立全寬捲動列 + 右側「▾」翻頁鍵
+        // 候選：全寬捲動列 + ⌄ 下拉（§130）
         candidateStack.axis = .horizontal
         candidateStack.spacing = 12
         candidateStack.alignment = .center
@@ -346,10 +384,8 @@ final class KeyboardViewController: UIInputViewController {
             candidateStack.bottomAnchor.constraint(equalTo: candidateBar.contentLayoutGuide.bottomAnchor),
             candidateStack.heightAnchor.constraint(equalTo: candidateBar.frameLayoutGuide.heightAnchor),
         ])
-        expandButton.setImage(UIImage(systemName: "chevron.down"), for: .normal)   // 原廠灰 chevron（§89，去藍 ▾）
-        expandButton.tintColor = .secondaryLabel
-        expandButton.widthAnchor.constraint(equalToConstant: 36).isActive = true
-        expandButton.addAction(UIAction { [weak self] _ in self?.toggleExpanded() }, for: .touchUpInside)
+
+        candidateBar.setContentHuggingPriority(UILayoutPriority(1), for: .horizontal)   // 候選吃剩餘寬（⌄ 固定右）
 
         let candidateRow = UIStackView(arrangedSubviews: [candidateBar, expandButton])
         candidateRow.axis = .horizontal
@@ -455,10 +491,10 @@ final class KeyboardViewController: UIInputViewController {
             }
             keyRowsStack.addArrangedSubview(bopomoFunctionRow())
         }
-        candidateRowRef?.isHidden = (mode != .bopomo)   // 英文/123 收候選列（§86）；注音恆顯（§130 固定）
+        candidateRowRef?.isHidden = (mode != .bopomo)   // 英文/123 收候選列（§86）；注音恆顯（§130 候選列固定）
         if mode == .english { refreshEnglishCase() } else { updateModeStyling() }
         applyHeight()                                   // 列數變動即更新高度（§90 原廠風格變動高度）
-        if #available(iOS 26.0, *), Self.realGlass { buildGlassLayer() }   // §97 官方玻璃容器
+        if #available(iOS 26.0, *) { useGlassKeys ? buildGlassLayer() : teardownGlassLayer() }   // §97 官方玻璃容器（§141 啟用）
     }
 
     // MARK: - 英文 QWERTY 頁（§46）
@@ -549,7 +585,7 @@ final class KeyboardViewController: UIInputViewController {
     private func englishFunctionRow() -> UIStackView {
         let zh = grayKey(keyButton(title: "中") { [weak self] in self?.setMode(.bopomo) })   // 回注音
         let num = grayKey(keyButton(title: "123") { [weak self] in self?.setMode(.numbers) })
-        let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠線條笑臉（§135）
+        let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠無填滿線條笑臉（§135）
         let space = wideSpaceKey()
         let ret = returnKey()
         let keys = [zh, num, emoji, space, ret]
@@ -561,8 +597,7 @@ final class KeyboardViewController: UIInputViewController {
     static let keyRadius: CGFloat = 8   // iOS 26 鍵盤鍵圓角（§77，較圓潤）
 
     // MARK: - 版本分層樣式（§93/§94 KeyStyle）
-    /// true＝真 Liquid Glass（UIGlassEffect）測試版；false＝主版（iOS26 用 §92 霜白）。出 glass IPA 時翻 true。
-    static let realGlass = false
+    /// 真 Liquid Glass（UIGlassEffect）由 ⚙「iOS 26 玻璃按鍵」開關 opt-in（§141）；風格(霜面/透明)+色調見選單。
     /// iOS 26 以上才套圓角/玻璃等「未來感」視覺；16–18 走原廠 classic（方正、實心）。
     private var isOS26: Bool { if #available(iOS 26.0, *) { return true }; return false }
     private var keyCornerCurve: CALayerCornerCurve { isOS26 ? .continuous : .circular }
@@ -572,28 +607,15 @@ final class KeyboardViewController: UIInputViewController {
     /// 僅換底色、沿用 keyButton 既有圓角與 1px 細陰影，無系統材質＝無浮凸/無偏色。
     @available(iOS 26.0, *)
     private func applyGlass(_ b: UIButton, prominent: Bool) {
-        b.titleLabel?.font = .systemFont(ofSize: (prominent ? 23 : 16) * fontScale)
-        if Self.realGlass {                                       // 真 Liquid Glass（§97 官方容器）：此處只「登記」，玻璃由 buildGlassLayer 統一建
-            b.backgroundColor = .clear
-            b.layer.shadowOpacity = 0
-            if let k = b as? KeyButton {                          // 按壓回饋：clear 底上閃白
-                k.restingColor = .clear
-                k.pressedColor = UIColor.white.withAlphaComponent(0.4)
-            }
-            glassKeyButtons.append((b, prominent))
-            return
+        // 真 Liquid Glass（§97 官方容器，§141 啟用）：此處只「登記」，玻璃由 buildGlassLayer 統一建（風格/色調讀 kbopt）。
+        // 不覆寫字體 → 沿用 keyButton 25pt / bopomo .light / grayKey 16pt。
+        b.backgroundColor = .clear
+        b.layer.shadowOpacity = 0
+        if let k = b as? KeyButton {                          // 按壓回饋：clear 底上閃白
+            k.restingColor = .clear
+            k.pressedColor = UIColor.white.withAlphaComponent(0.4)
         }
-        // 霜白：淺色用高白 alpha（疊淺底→淺鍵）；深色用低白 alpha（疊深底→只微亮、不過曝，§106）
-        let rest = UIColor { tc in
-            let a: CGFloat = tc.userInterfaceStyle == .dark ? (prominent ? 0.20 : 0.12) : (prominent ? 0.55 : 0.30)
-            return UIColor.white.withAlphaComponent(a)
-        }
-        let press = UIColor { tc in
-            let a: CGFloat = tc.userInterfaceStyle == .dark ? (prominent ? 0.34 : 0.24) : (prominent ? 0.85 : 0.60)
-            return UIColor.white.withAlphaComponent(a)
-        }
-        b.backgroundColor = rest
-        if let k = b as? KeyButton { k.restingColor = rest; k.pressedColor = press }
+        glassKeyButtons.append((b, prominent))
     }
 
     /// 官方 Liquid Glass 多元件正解（§97）：一個 UIGlassContainerEffect 容器，
@@ -601,7 +623,7 @@ final class KeyboardViewController: UIInputViewController {
     @available(iOS 26.0, *)
     private func buildGlassLayer() {
         teardownGlassLayer()
-        guard Self.realGlass, let rs = rootStack, rs.superview != nil, !glassKeyButtons.isEmpty else { return }
+        guard useGlassKeys, let rs = rootStack, rs.superview != nil, !glassKeyButtons.isEmpty else { return }
         let container = UIVisualEffectView(effect: UIGlassContainerEffect())
         container.isUserInteractionEnabled = false
         container.translatesAutoresizingMaskIntoConstraints = false
@@ -613,9 +635,9 @@ final class KeyboardViewController: UIInputViewController {
             container.bottomAnchor.constraint(equalTo: keyRowsStack.bottomAnchor),
         ])
         for (btn, prominent) in glassKeyButtons {
-            let e = UIGlassEffect(style: .clear)
+            let e = UIGlassEffect(style: localOpt(Self.glassStyleKey) ? .clear : .regular)   // §141 風格：透明/霜面
             e.isInteractive = false                              // 靜態鍵不需互動透鏡（§95）
-            e.tintColor = UIColor.white.withAlphaComponent(prominent ? 0.55 : 0.32)   // 白底（§96），content 較白
+            e.tintColor = glassTintColor ?? UIColor.white.withAlphaComponent(prominent ? 0.55 : 0.32)   // §141 色調；無色沿用白底（§96）
             let g = UIVisualEffectView(effect: e)
             g.isUserInteractionEnabled = false
             g.layer.cornerRadius = Self.keyRadius
@@ -720,7 +742,7 @@ final class KeyboardViewController: UIInputViewController {
     private func bopomoFunctionRow() -> UIStackView {
         let num = grayKey(keyButton(title: "123") { [weak self] in self?.setMode(.numbers) })
         let cnEn = grayKey(keyButton(title: "英") { [weak self] in self?.setMode(.english) })  // 切英文 QWERTY
-        let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠線條笑臉（§135）
+        let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠無填滿線條笑臉（§135）
         let space = wideSpaceKey()
         let ret = returnKey()
         let keys = withGlobe([num, cnEn, emoji, space, ret])
@@ -731,7 +753,7 @@ final class KeyboardViewController: UIInputViewController {
     private func numberFunctionRow() -> UIStackView {
         let backTitle = lastLetterMode == .english ? "ABC" : "注音"
         let back = grayKey(keyButton(title: backTitle) { [weak self] in self?.setMode(self?.lastLetterMode ?? .bopomo) })
-        let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠線條笑臉（§135）
+        let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠無填滿線條笑臉（§135）
         let space = wideSpaceKey()
         let ret = returnKey()
         let keys = withGlobe([back, emoji, space, ret])
@@ -794,7 +816,7 @@ final class KeyboardViewController: UIInputViewController {
 
     /// iOS 26 玻璃功能鍵是否啟用（鍵盤本地開關 + 系統版本，§57/§65）。
     private var useGlassKeys: Bool {
-        if #available(iOS 26.0, *) { return localOpt(Self.glassKey, default: Self.realGlass) }   // 主版預設關霜白；glass IPA 預設開（§94）
+        if #available(iOS 26.0, *) { return localOpt(Self.glassKey, default: false) }   // 預設關（實心鍵）；玻璃為 opt-in（§141）
         return false
     }
 
@@ -834,6 +856,7 @@ final class KeyboardViewController: UIInputViewController {
     /// 雙標注音鍵：大字注音 + 角落小字英文；上下划輸入英文（§26.2 / §28）。
     private func bopomoKey(_ key: BopomoLayout.Key) -> UIButton {
         let b = keyButton(title: key.symbol) { [weak self] in self?.tapBopomo(key) }
+        b.titleLabel?.font = .systemFont(ofSize: 25 * fontScale, weight: .light)   // §141 注音字形對標原廠：細筆畫（原 regular 偏粗）
         let eng = UILabel()
         eng.text = key.englishLabel
         eng.font = .systemFont(ofSize: 10 * fontScale, weight: .medium)
