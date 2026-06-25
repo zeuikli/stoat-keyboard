@@ -252,7 +252,7 @@ final class KeyboardViewController: UIInputViewController {
     private static let quickPunctKey = "kbopt_quickPunct"       // 第一列標點段顯示（§121）
     private static let quickKaomojiKey = "kbopt_quickKaomoji"   // 第一列顏文字段顯示（§121）
     private var numberSubPage = 0                       // 123 頁子頁（0/1，§66）
-    private var showNumberRow: Bool { localOpt(Self.numberRowKey, default: true) }
+    private var showNumberRow: Bool { localOpt(Self.numberRowKey, default: false) }
 
     /// 123 標點模式（§82）：0=自動依中英、1=半形、2=全形。
     private static let n123ModeKey = "kbopt_123mode"
@@ -315,7 +315,7 @@ final class KeyboardViewController: UIInputViewController {
                                     children: [gtint("無色", 0), gtint("藍", 1), gtint("灰", 2), gtint("暖", 3)]))
             }
         }
-        items.append(toggle("常駐數字列", Self.numberRowKey, localOpt(Self.numberRowKey, default: true)) { [weak self] _ in self?.rebuildKeyRows() })
+        items.append(toggle("常駐數字列", Self.numberRowKey, localOpt(Self.numberRowKey, default: false)) { [weak self] _ in self?.rebuildKeyRows() })
         items.append(toggle("注音鍵英文提示", Self.engHintKey, localOpt(Self.engHintKey)) { [weak self] _ in self?.rebuildKeyRows() })
         // 第一列固定（§130）：標點 / 顏文字各自決定是否顯示
         items.append(toggle("第一列標點", Self.quickPunctKey, localOpt(Self.quickPunctKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
@@ -505,10 +505,12 @@ final class KeyboardViewController: UIInputViewController {
     /// 英文模式候選（§142）：取游標前最後一個英文單字，用 UITextChecker 系統字典補全顯示於候選列。
     /// 空字串時顯示常用起首字（近似原廠 QuickType 起句建議；完整 next-word 預測需語言模型，暫不做）。
     private func refreshEnglishCandidates() {
-        guard mode == .english else { return }
-        candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        guard mode == .english || mode == .bopomo else { return }
         let before = textDocumentProxy.documentContextBeforeInput ?? ""
         let partial = String(String(before.reversed()).prefix { $0.isLetter || $0 == "'" }.reversed())
+        // 注音模式（§142 #2 上滑打英文）：只在正打英文單字且未組字時顯示補全，否則不干擾中文候選/快捷列
+        if mode == .bopomo, partial.isEmpty || !isPreeditEmpty { return }
+        candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         let words: [String]
         if partial.isEmpty {
             // 句首/空白後：常用起首字
@@ -535,7 +537,12 @@ final class KeyboardViewController: UIInputViewController {
         for _ in 0..<partial.count { textDocumentProxy.deleteBackward() }
         textDocumentProxy.insertText(word + " ")
         if shiftState == .shifted { shiftState = .off; refreshEnglishCase() }
-        refreshEnglishCandidates()
+        if mode == .bopomo {   // §142 #2：補完後還原注音閒置快捷列
+            candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+            refreshIdleQuickRow()
+        } else {
+            refreshEnglishCandidates()
+        }
     }
 
     private func buildEnglishRows() {
@@ -923,6 +930,7 @@ final class KeyboardViewController: UIInputViewController {
             refresh(RimeUpdate(preedit: "", candidates: [], commit: nil))
         }
         textDocumentProxy.insertText(s)
+        refreshEnglishCandidates()   // §142 #2 注音/英文上滑英文 → 系統字典補全（內部依模式判斷）
     }
 
     /// 英文模式凸顯英文（依 Shift 顯示大/小寫）、淡化注音；同步 中/英、Shift 鍵（§26.2 / §31）。
