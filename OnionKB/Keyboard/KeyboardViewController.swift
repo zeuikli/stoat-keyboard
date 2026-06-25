@@ -688,9 +688,12 @@ final class KeyboardViewController: UIInputViewController {
             let e = UIGlassEffect(style: localOpt(Self.glassStyleKey) ? .clear : .regular)   // §141 風格：透明/霜面
             e.isInteractive = false                              // 靜態鍵不需互動透鏡（§95）
             // §143 深色模式修正：白 tint 在深色背景會把鍵洗亮 → 深色改低白 alpha（鍵呈暗灰、貼近原廠）。
+            // 深色玻璃改用「深灰 tint」對齊非玻璃 #6B6B6B（白 tint 會把鍵洗亮；§143/§144）
             let isDark = traitCollection.userInterfaceStyle == .dark
-            let tintAlpha: CGFloat = isDark ? (prominent ? 0.22 : 0.14) : (prominent ? 0.55 : 0.32)
-            e.tintColor = glassTintColor ?? UIColor.white.withAlphaComponent(tintAlpha)   // §141 色調；無色沿用白/深底
+            let defaultTint: UIColor = isDark
+                ? UIColor(white: 107/255, alpha: prominent ? 0.85 : 0.70)   // 深色：灰 tint → 鍵呈 #6B6B6B 暗灰
+                : UIColor.white.withAlphaComponent(prominent ? 0.55 : 0.32)
+            e.tintColor = glassTintColor ?? defaultTint   // §141 色調；無色＝淺白/深灰底
             let g = UIVisualEffectView(effect: e)
             g.isUserInteractionEnabled = false
             g.layer.cornerRadius = Self.keyRadius
