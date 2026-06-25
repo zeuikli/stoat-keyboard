@@ -118,7 +118,7 @@ final class KeyboardViewController: UIInputViewController {
                 kbBackdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             ])
         }
-        if isOS26 {                                                  // 上緣圓角僅 iOS 26（§94）；16–18 方正貼原廠
+        if isOS26 && !Self.flatStyleIOS18 {                          // 上緣圓角僅 iOS 26（§94）；iOS18 變體方正貼原廠
             view.layer.cornerRadius = 26                             // 原廠量測 ~26pt 視覺（§102）
             view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
             view.layer.cornerCurve = .continuous
@@ -656,13 +656,13 @@ final class KeyboardViewController: UIInputViewController {
 
     static let funcKeyGray = KBColor.funcKey   // §99 動態（淺灰/深灰）
 
-    static let keyRadius: CGFloat = 8   // iOS 26 鍵盤鍵圓角（§77，較圓潤）
+    static var keyRadius: CGFloat { flatStyleIOS18 ? 5 : 8 }   // §146 iOS18 變體＝5pt（iOS26 圓潤 8pt，§77）
 
     // MARK: - 版本分層樣式（§93/§94 KeyStyle）
     /// 真 Liquid Glass（UIGlassEffect）由 ⚙「iOS 26 玻璃按鍵」開關 opt-in（§141）；風格(霜面/透明)+色調見選單。
     /// iOS 26 以上才套圓角/玻璃等「未來感」視覺；16–18 走原廠 classic（方正、實心）。
     private var isOS26: Bool { if #available(iOS 26.0, *) { return true }; return false }
-    private var keyCornerCurve: CALayerCornerCurve { isOS26 ? .continuous : .circular }
+    private var keyCornerCurve: CALayerCornerCurve { (Self.flatStyleIOS18 || !isOS26) ? .circular : .continuous }   // §146 iOS18 變體＝circular（iOS26 squircle）
 
     /// iOS 26 「玻璃」鍵（§92）：系統 UIButton.Configuration.glass() 在實機渲染異常
     /// （§88 藍底、§92 浮凸陰影，本機無 GUI 不可重現）→ 改用可預期的**半透明霜白**：
@@ -711,7 +711,7 @@ final class KeyboardViewController: UIInputViewController {
             let g = UIVisualEffectView(effect: e)
             g.isUserInteractionEnabled = false
             g.layer.cornerRadius = Self.keyRadius
-            g.layer.cornerCurve = .continuous
+            g.layer.cornerCurve = keyCornerCurve   // §146 iOS18 變體玻璃鍵也 circular
             g.clipsToBounds = true
             container.contentView.addSubview(g)                 // 巢狀進 container.contentView → 合併渲染
             glassPairs.append((btn, g))
