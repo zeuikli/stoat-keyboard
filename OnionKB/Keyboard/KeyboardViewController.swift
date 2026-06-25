@@ -41,8 +41,8 @@ enum KBColor {
                            UIColor(red: 23/255, green: 23/255, blue: 23/255, alpha: 1))
     /// 內容鍵：淺＝白；深＝官方語意 systemGray2(#636366)（§144 SDK 語意色，原廠深色字鍵）
     static let contentKey = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray2.resolvedColor(with: $0) : .white }
-    /// 功能鍵：淺＝白；深＝systemGray3(#48484A)（比 content 暗一階，§144）
-    static let funcKey = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray3.resolvedColor(with: $0) : .white }
+    /// 功能鍵：淺＝systemGray2(#AEAEB2 原廠灰功能鍵)；深＝systemGray3(#48484A)（§145 全語意色；原淺色寫死 .white 不對）
+    static let funcKey = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray3.resolvedColor(with: $0) : UIColor.systemGray2.resolvedColor(with: $0) }
     /// 功能鍵按下：淺＝systemGray4(白鍵壓暗)；深＝systemGray2(暗鍵壓亮，§144)
     static let funcKeyPressed = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray2.resolvedColor(with: $0) : UIColor.systemGray4.resolvedColor(with: $0) }
 }
