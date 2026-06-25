@@ -684,13 +684,16 @@ final class KeyboardViewController: UIInputViewController {
             container.topAnchor.constraint(equalTo: keyRowsStack.topAnchor),
             container.bottomAnchor.constraint(equalTo: keyRowsStack.bottomAnchor),
         ])
-        for (btn, _) in glassKeyButtons {
+        for (btn, prominent) in glassKeyButtons {
             let e = UIGlassEffect(style: localOpt(Self.glassStyleKey) ? .clear : .regular)   // §141 風格：透明/霜面
             e.isInteractive = false                              // 靜態鍵不需互動透鏡（§95）
-            // §143 深色模式修正：白 tint 在深色背景會把鍵洗亮 → 深色改低白 alpha（鍵呈暗灰、貼近原廠）。
-            // §144 官方依據：UIGlassEffect.tintColor 可為 nil → 系統渲染 iOS 26 官方玻璃外觀（自動深淺）。
-            // 之前自加白/灰 tint 反而蓋掉官方色 → 預設不染色，只有使用者選「色調」才染。
-            e.tintColor = glassTintColor
+            // §145：tint=nil（官方）在「純色底」會讓鍵消失（玻璃無 App 內容可折射）→ 必須染色才可見。
+            // 用 SDK 官方語意色當 tint，對齊非玻璃：深色 systemGray2(內容)/Gray3(功能)、淺色白；高 alpha 確保可見。
+            let dark = traitCollection.userInterfaceStyle == .dark
+            let base: UIColor = dark
+                ? (prominent ? UIColor.systemGray2 : UIColor.systemGray3).resolvedColor(with: traitCollection)
+                : .white
+            e.tintColor = glassTintColor ?? base.withAlphaComponent(dark ? 0.92 : 0.55)
             let g = UIVisualEffectView(effect: e)
             g.isUserInteractionEnabled = false
             g.layer.cornerRadius = Self.keyRadius
