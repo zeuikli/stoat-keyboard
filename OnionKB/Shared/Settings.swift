@@ -43,9 +43,9 @@ enum KBSettings {
     }
 
     // 鍵盤高度（§24 #5）
-    static let minHeight: CGFloat = 280
+    static let minHeight: CGFloat = 250      // §139 R2
     static let maxHeight: CGFloat = 480
-    static let defaultHeight: CGFloat = 350
+    static let defaultHeight: CGFloat = 325  // §139 R2（折衷）
     private static let kHeight = "keyboardHeight"
 
     static var keyboardHeight: CGFloat {

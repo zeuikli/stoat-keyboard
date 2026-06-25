@@ -23,6 +23,9 @@ switches:
   - name: simplification
     reset: 0
     states: ["原體", "简体"]
+  - name: emoji
+    reset: 0
+    states: ["🚫", "😄"]
   # - options: [ utf8, big5, gbk ]
   #   # reset: 0
   #   states:
@@ -38,6 +41,7 @@ engine:
 #     - charset_filter@big5
 #     - charset_filter@gbk
     - simplifier@zh_cn
+    - simplifier@emoji
     - reverse_lookup_filter@bpm_reverse_lookup
     - uniquifier
   processors:
@@ -547,3 +551,11 @@ predictor:
   max_iterations: 1
 grammar:
   language: zh-hant-t-essay-bgc
+
+# === OnionKB 表情候選（§138 #2）===
+emoji:
+  opencc_config: emoji_t.json
+  option_name: emoji
+  tips: none
+  inherit_comment: false
+  tags: [ abc ]

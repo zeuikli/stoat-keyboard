@@ -209,7 +209,11 @@ final class KeyboardViewController: UIInputViewController {
         let refRows = CGFloat(showNumberRow ? 6 : 5)                 // 注音參考列數（數字列 + 4 注音 + 功能）
         // 由注音反推固定鍵高 → 各模式套同一 rowH，按鍵大小一致
         let rowH = max(38, (KBSettings.keyboardHeight - bopomoChrome - (refRows - 1) * rowGap) / refRows)
-        let curRows = CGFloat(max(1, keyRowsStack.arrangedSubviews.count))
+        // §138 #3：123 頁高度對齊英文頁（英文頁列數作基準，鍵列 fillEqually 撐滿）
+        let englishRows = CGFloat((showNumberRow ? 1 : 0) + 3 + 1)
+        let curRows = (mode == .numbers)
+            ? max(englishRows, CGFloat(keyRowsStack.arrangedSubviews.count))
+            : CGFloat(max(1, keyRowsStack.arrangedSubviews.count))
         let chrome = (mode == .bopomo) ? bopomoChrome : baseChrome   // 候選列僅注音顯示（§130 候選列固定）
         let h = chrome + curRows * rowH + (curRows - 1) * rowGap
         if let c = heightConstraint {
@@ -271,7 +275,7 @@ final class KeyboardViewController: UIInputViewController {
                 self?.setLocalOpt(key, !on); apply(!on); self?.refreshOptionsMenu()
             }
         }
-        var items: [UIMenuElement] = SchemaOption.allCases.filter { $0 != .asciiMode }.map { opt in
+        var items: [UIMenuElement] = SchemaOption.allCases.filter { ![.asciiMode, .fullShape, .asciiPunct].contains($0) }.map { opt in  // §138 #1
             toggle(opt.title, optKey(opt), localOpt(optKey(opt), default: opt.defaultOn)) { [weak self] v in
                 self?.engine.setOption(opt.rawValue, v)
                 if opt == .fullShape { self?.rebuildKeyRows() }   // 123 頁半全形即時更新（§71）

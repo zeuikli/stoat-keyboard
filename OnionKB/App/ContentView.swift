@@ -9,11 +9,6 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("輸入選項") {
-                    Label("請用鍵盤右上角的 ⚙ 選單調整", systemImage: "slider.horizontal.3")
-                    Text("簡繁、全/半形、標點、表情/顏文字候選、注音英文提示、iOS 26 玻璃按鍵等，都在鍵盤上的 ⚙ 內即時切換。").font(.footnote).foregroundStyle(.secondary)
-                    Text("側載安裝下 App 與鍵盤是不同沙盒、無法同步設定（App Group 重簽後失效），故統一由鍵盤 ⚙ 控制——這裡不再放重複開關以免誤會。").font(.footnote).foregroundStyle(.secondary)
-                }
                 Section("鍵盤高度") {
                     Slider(value: $keyboardHeight,
                            in: KBSettings.minHeight...KBSettings.maxHeight,
@@ -35,9 +30,11 @@ struct ContentView: View {
                     .onChange(of: fontScale) { newValue in KBSettings.keyFontScale = newValue }
                     Text("目前：\(Int(fontScale * 100))%").font(.footnote).foregroundStyle(.secondary)
                 }
-                Section("注音（內建洋蔥純注音）") {
+                Section("純注音與Plus") {
                     Label("加入鍵盤後即可打注音", systemImage: "keyboard")
                     Text("設定 → 一般 → 鍵盤 → 加入新鍵盤 → Stoat")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Text("提供兩種詞庫版本：純注音（核心字詞）與 Plus（再加 81 萬擴充詞組），分別打包，安裝對應版本即可。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section("詞庫 / UserData") {
@@ -46,11 +43,6 @@ struct ContentView: View {
                     } label: {
                         Label("我的詞庫 / UserData（看 + 改）", systemImage: "books.vertical")
                     }
-                }
-                Section("狀態") {
-                    Text("引擎：librime（洋蔥純注音，內建預編譯詞庫）")
-                    Text("注音支援聲韻母亂序、表情/顏文字候選、選項切換與自訂詞庫")
-                        .font(.footnote).foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Stoat 白鼬注音")
