@@ -491,7 +491,7 @@ final class KeyboardViewController: UIInputViewController {
             }
             keyRowsStack.addArrangedSubview(bopomoFunctionRow())
         }
-        candidateRowRef?.isHidden = (mode != .bopomo)   // 英文/123 收候選列（§86）；注音恆顯（§130 候選列固定）
+        candidateRowRef?.isHidden = (mode == .numbers)   // §142 英文也顯候選列（補全）；123 收起；注音恆顯
         if mode == .english { refreshEnglishCase() } else { updateModeStyling() }
         applyHeight()                                   // 列數變動即更新高度（§90 原廠風格變動高度）
         if #available(iOS 26.0, *) { useGlassKeys ? buildGlassLayer() : teardownGlassLayer() }   // §97 官方玻璃容器（§141 啟用）
@@ -500,6 +500,43 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - 英文 QWERTY 頁（§46）
 
     private var englishLetterButtons: [(letter: String, button: UIButton)] = []
+    private let textChecker = UITextChecker()   // §142 英文候選：系統字典補全
+
+    /// 英文模式候選（§142）：取游標前最後一個英文單字，用 UITextChecker 系統字典補全顯示於候選列。
+    /// 空字串時顯示常用起首字（近似原廠 QuickType 起句建議；完整 next-word 預測需語言模型，暫不做）。
+    private func refreshEnglishCandidates() {
+        guard mode == .english else { return }
+        candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let partial = String(String(before.reversed()).prefix { $0.isLetter || $0 == "'" }.reversed())
+        let words: [String]
+        if partial.isEmpty {
+            // 句首/空白後：常用起首字
+            let starters = ["I", "The", "I'm", "It's", "We", "You", "Thanks"]
+            let lastChar = before.last
+            words = (before.isEmpty || lastChar == " " || lastChar == "\n") ? starters : []
+        } else {
+            let range = NSRange(location: 0, length: (partial as NSString).length)
+            let comps = textChecker.completions(forPartialWordRange: range, in: partial, language: "en_US") ?? []
+            words = Array(comps.prefix(16))
+        }
+        for word in words {
+            let b = UIButton(type: .system)
+            b.setTitle(word, for: .normal)
+            b.titleLabel?.font = .systemFont(ofSize: 18 * fontScale)
+            b.setTitleColor(.label, for: .normal)
+            b.addAction(UIAction { [weak self] _ in self?.applyEnglishCompletion(partial: partial, word: word) }, for: .touchUpInside)
+            candidateStack.addArrangedSubview(b)
+        }
+    }
+
+    /// 選英文候選：刪掉已打的部分單字 → 插入完整字 + 空格。
+    private func applyEnglishCompletion(partial: String, word: String) {
+        for _ in 0..<partial.count { textDocumentProxy.deleteBackward() }
+        textDocumentProxy.insertText(word + " ")
+        if shiftState == .shifted { shiftState = .off; refreshEnglishCase() }
+        refreshEnglishCandidates()
+    }
 
     private func buildEnglishRows() {
         englishLetterButtons.removeAll()
@@ -542,6 +579,7 @@ final class KeyboardViewController: UIInputViewController {
     private func tapEnglish(_ lower: String) {
         textDocumentProxy.insertText(typeUppercase ? lower.uppercased() : lower)
         if shiftState == .shifted { shiftState = .off; refreshEnglishCase() }
+        refreshEnglishCandidates()   // §142 即時更新英文補全
     }
 
     private func refreshEnglishCase() {
@@ -797,6 +835,7 @@ final class KeyboardViewController: UIInputViewController {
             currentCandidates = []
             compositionLabel.text = " "
             candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+            if m == .english { refreshEnglishCandidates() }   // §142 進英文頁即顯補全
         }
     }
 
@@ -825,7 +864,7 @@ final class KeyboardViewController: UIInputViewController {
         let b = KeyButton(frame: .zero)         // 必用 designated init：UIButton(type:) 工廠會忽略子類（§57）
         b.setContentCompressionResistancePriority(.defaultLow, for: .vertical)   // 高度不足時鍵自縮、不撐爆（§58）
         b.setTitle(title, for: .normal)
-        b.titleLabel?.font = .systemFont(ofSize: 25 * fontScale, weight: .light)   // §141 所有內容鍵（注音/英文/數字/123）對標原廠：25pt 細筆畫
+        b.titleLabel?.font = .systemFont(ofSize: 25 * fontScale)   // §142 內容鍵 25pt regular（英文/數字/123 對標原廠中等粗；注音另覆寫 .light）
         b.titleLabel?.numberOfLines = 1                            // 防 123/ABC/#+= 換行（§88）
         b.titleLabel?.adjustsFontSizeToFitWidth = true
         b.titleLabel?.minimumScaleFactor = 0.6
@@ -856,7 +895,8 @@ final class KeyboardViewController: UIInputViewController {
 
     /// 雙標注音鍵：大字注音 + 角落小字英文；上下划輸入英文（§26.2 / §28）。
     private func bopomoKey(_ key: BopomoLayout.Key) -> UIButton {
-        let b = keyButton(title: key.symbol) { [weak self] in self?.tapBopomo(key) }   // 字體沿用 keyButton .light（§141）
+        let b = keyButton(title: key.symbol) { [weak self] in self?.tapBopomo(key) }
+        b.titleLabel?.font = .systemFont(ofSize: 25 * fontScale, weight: .light)   // §142 注音對標原廠細筆畫（英文/123 維持 regular）
         let eng = UILabel()
         eng.text = key.englishLabel
         eng.font = .systemFont(ofSize: 10 * fontScale, weight: .medium)
@@ -943,6 +983,7 @@ final class KeyboardViewController: UIInputViewController {
     private func tapSpace() {
         if isPreeditEmpty { textDocumentProxy.insertText(" ") }
         else { apply(engine.processKey(BopomoLayout.keySpace)) }
+        if mode == .english { refreshEnglishCandidates() }   // §142
     }
 
     /// 長按空白鍵滑動移游標（§39，比照 iOS 觸控板）。
@@ -1002,6 +1043,7 @@ final class KeyboardViewController: UIInputViewController {
     private func tapBackspace() {
         if isPreeditEmpty { textDocumentProxy.deleteBackward() }
         else { apply(engine.processKey(BopomoLayout.keyBackspace)) }
+        if mode == .english { refreshEnglishCandidates() }   // §142
     }
 
     private func tapEnter() {
