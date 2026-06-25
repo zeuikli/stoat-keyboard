@@ -17,8 +17,8 @@ final class ClosureSwipe: UISwipeGestureRecognizer {
 /// `pressedColor == nil` → 不手動高亮（交給 iOS 26 glass 互動動畫或系統）。
 final class KeyButton: UIButton {
     var restingColor: UIColor? = KBColor.contentKey
-    // 淺：白鍵壓暗 systemGray4；深：systemGray4 鍵壓亮 systemGray3（深色也有按壓回饋，§108）
-    var pressedColor: UIColor? = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray3.resolvedColor(with: $0) : UIColor.systemGray4.resolvedColor(with: $0) }
+    // 淺：白鍵壓暗 systemGray4；深：#6B6B6B 鍵壓亮 #8E8E93（深色按壓回饋，§143）
+    var pressedColor: UIColor? = UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 142/255, alpha: 1) : UIColor.systemGray4.resolvedColor(with: $0) }
     override var isHighlighted: Bool {
         didSet {
             guard oldValue != isHighlighted, let pressed = pressedColor else { return }
@@ -39,12 +39,12 @@ enum KBColor {
     /// 鍵盤底（原廠 iOS 26 精確量測，§102）：淺 #E2E4E8 / 深 #171717
     static let panel = dyn(UIColor(red: 226/255, green: 228/255, blue: 232/255, alpha: 1),
                            UIColor(red: 23/255, green: 23/255, blue: 23/255, alpha: 1))
-    /// 內容鍵：淺＝白；深＝官方語意灰 systemGray4（SDK 深色鍵色，§108）
-    static let contentKey = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray4.resolvedColor(with: $0) : .white }
-    /// 功能鍵：淺＝白；深＝systemGray5（比 content 暗一階，§108）
-    static let funcKey = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray5.resolvedColor(with: $0) : .white }
-    /// 功能鍵按下：淺＝systemGray4(白鍵壓暗)；深＝systemGray3(暗鍵壓亮)，兩模式都有回饋（§108）
-    static let funcKeyPressed = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray3.resolvedColor(with: $0) : UIColor.systemGray4.resolvedColor(with: $0) }
+    /// 內容鍵：淺＝白；深＝原廠 iOS 深色鍵灰 #6B6B6B（§143；原 systemGray4 #3A3A3C 過暗）
+    static let contentKey = UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 107/255, alpha: 1) : .white }
+    /// 功能鍵：淺＝白；深＝原廠功能鍵 #474747（比 content 暗一階，§143）
+    static let funcKey = UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 71/255, alpha: 1) : .white }
+    /// 功能鍵按下：淺＝systemGray4(白鍵壓暗)；深＝#6B6B6B(暗鍵壓亮，§143)
+    static let funcKeyPressed = UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 107/255, alpha: 1) : UIColor.systemGray4.resolvedColor(with: $0) }
 }
 
 /// 注音鍵盤主控制器（SPEC §7.2 / §15.3 / §24 / §27）。
