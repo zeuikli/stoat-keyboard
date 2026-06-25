@@ -216,7 +216,9 @@ final class KeyboardViewController: UIInputViewController {
         let curRows = (mode == .numbers)
             ? max(englishRows, CGFloat(keyRowsStack.arrangedSubviews.count))
             : CGFloat(max(1, keyRowsStack.arrangedSubviews.count))
-        let chrome = (mode == .bopomo) ? bopomoChrome : baseChrome   // 候選列僅注音顯示（§130 候選列固定）
+        // §142 chrome 依候選列實際顯隱：注音恆顯、英文「有補全才顯」（空時收起＝對齊原廠矮高度）、123 不顯。
+        let candVisible = !(candidateRowRef?.isHidden ?? true)
+        let chrome = candVisible ? bopomoChrome : baseChrome
         let h = chrome + curRows * rowH + (curRows - 1) * rowGap
         if let c = heightConstraint {
             c.constant = h
@@ -491,7 +493,7 @@ final class KeyboardViewController: UIInputViewController {
             }
             keyRowsStack.addArrangedSubview(bopomoFunctionRow())
         }
-        candidateRowRef?.isHidden = (mode == .numbers)   // §142 英文也顯候選列（補全）；123 收起；注音恆顯
+        candidateRowRef?.isHidden = (mode != .bopomo)   // §142 注音恆顯；英文/123 預設收起（英文有補全時由 refreshEnglishCandidates 展開，對齊原廠矮高度）
         if mode == .english { refreshEnglishCase() } else { updateModeStyling() }
         applyHeight()                                   // 列數變動即更新高度（§90 原廠風格變動高度）
         if #available(iOS 26.0, *) { useGlassKeys ? buildGlassLayer() : teardownGlassLayer() }   // §97 官方玻璃容器（§141 啟用）
@@ -503,7 +505,7 @@ final class KeyboardViewController: UIInputViewController {
     private let textChecker = UITextChecker()   // §142 英文候選：系統字典補全
 
     /// 英文模式候選（§142）：取游標前最後一個英文單字，用 UITextChecker 系統字典補全顯示於候選列。
-    /// 空字串時顯示常用起首字（近似原廠 QuickType 起句建議；完整 next-word 預測需語言模型，暫不做）。
+    /// 沒打單字時候選列收起（對齊原廠英文鍵盤矮高度）；打字才出補全。next-word 預測需語言模型，暫不做。
     private func refreshEnglishCandidates() {
         guard mode == .english || mode == .bopomo else { return }
         let before = textDocumentProxy.documentContextBeforeInput ?? ""
@@ -511,12 +513,10 @@ final class KeyboardViewController: UIInputViewController {
         // 注音模式（§142 #2 上滑打英文）：只在正打英文單字且未組字時顯示補全，否則不干擾中文候選/快捷列
         if mode == .bopomo, partial.isEmpty || !isPreeditEmpty { return }
         candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        // 英文：沒打單字 → 不顯補全（候選列收起，鍵盤維持原廠矮高度）；打字才補全
         let words: [String]
         if partial.isEmpty {
-            // 句首/空白後：常用起首字
-            let starters = ["I", "The", "I'm", "It's", "We", "You", "Thanks"]
-            let lastChar = before.last
-            words = (before.isEmpty || lastChar == " " || lastChar == "\n") ? starters : []
+            words = []
         } else {
             let range = NSRange(location: 0, length: (partial as NSString).length)
             let comps = textChecker.completions(forPartialWordRange: range, in: partial, language: "en_US") ?? []
@@ -529,6 +529,10 @@ final class KeyboardViewController: UIInputViewController {
             b.setTitleColor(.label, for: .normal)
             b.addAction(UIAction { [weak self] _ in self?.applyEnglishCompletion(partial: partial, word: word) }, for: .touchUpInside)
             candidateStack.addArrangedSubview(b)
+        }
+        if mode == .english {   // §142 英文：有補全才展開候選列（對齊原廠：idle 矮、打字才出建議列）
+            candidateRowRef?.isHidden = words.isEmpty
+            applyHeight()
         }
     }
 
