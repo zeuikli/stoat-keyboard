@@ -1,0 +1,3 @@
+# OnionKB 自訂詞庫（custom_phrase）
+# 格式：詞<Tab>注音碼<Tab>權重   例：   你好	nm4dk4	100
+# 注音碼＝大千鍵序（speller spelling）。於容器 App 編輯後按「套用」部署生效。

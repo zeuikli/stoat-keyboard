@@ -804,7 +804,7 @@ final class KeyboardViewController: UIInputViewController {
         let b = KeyButton(frame: .zero)         // 必用 designated init：UIButton(type:) 工廠會忽略子類（§57）
         b.setContentCompressionResistancePriority(.defaultLow, for: .vertical)   // 高度不足時鍵自縮、不撐爆（§58）
         b.setTitle(title, for: .normal)
-        b.titleLabel?.font = .systemFont(ofSize: 23 * fontScale)   // 原廠內容鍵大字（§49）
+        b.titleLabel?.font = .systemFont(ofSize: 25 * fontScale)   // 原廠內容鍵大字（§49；§140 對標原廠注音鍵 25pt）
         b.titleLabel?.numberOfLines = 1                            // 防 123/ABC/#+= 換行（§88）
         b.titleLabel?.adjustsFontSizeToFitWidth = true
         b.titleLabel?.minimumScaleFactor = 0.6
