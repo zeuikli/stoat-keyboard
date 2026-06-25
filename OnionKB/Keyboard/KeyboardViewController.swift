@@ -39,6 +39,9 @@ enum KBColor {
     /// 鍵盤底（原廠 iOS 26 精確量測，§102）：淺 #E2E4E8 / 深 #171717
     static let panel = dyn(UIColor(red: 226/255, green: 228/255, blue: 232/255, alpha: 1),
                            UIColor(red: 23/255, green: 23/255, blue: 23/255, alpha: 1))
+    /// §146 iOS 18 扁平實色鍵盤底（經典值）：淺 #D1D4DB / 深 #2C2C2E
+    static let flatBg = dyn(UIColor(red: 209/255, green: 212/255, blue: 219/255, alpha: 1),
+                            UIColor(red: 44/255, green: 44/255, blue: 46/255, alpha: 1))
     /// 內容鍵：淺＝白；深＝官方語意 systemGray2(#636366)（§144 SDK 語意色，原廠深色字鍵）
     static let contentKey = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray2.resolvedColor(with: $0) : .white }
     /// 功能鍵：淺＝systemGray2(#AEAEB2 原廠灰功能鍵)；深＝systemGray3(#48484A)（§145 全語意色；原淺色寫死 .white 不對）
@@ -72,6 +75,8 @@ final class KeyboardViewController: UIInputViewController {
     private var expandedPanel: UIScrollView?                       // 展開候選格面板（§89）
     private var isExpanded = false
     private let kbBackdrop = UIInputView(frame: .zero, inputViewStyle: .keyboard)   // 官方系統鍵盤底材（§105 native 方式）
+    /// §146 建置變體旗標：true＝iOS 18 扁平實色版（實心底，非半透材質），出 ios18 IPA 時翻 true。
+    static let flatStyleIOS18 = false
     // 真 Liquid Glass 層（§97，官方 UIGlassContainerEffect 容器 + 巢狀 glass）
     private var glassContainer: UIVisualEffectView?
     private var glassKeyButtons: [(button: UIButton, prominent: Bool)] = []   // 本輪 rebuild 登記的玻璃鍵
@@ -97,15 +102,19 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .clear                               // 底改由系統鍵盤底材提供（§105 native 方式）
-        kbBackdrop.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(kbBackdrop)                                 // 系統鍵盤底材：同原廠材質、自動深淺/半透、填滿整框
-        NSLayoutConstraint.activate([
-            kbBackdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            kbBackdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            kbBackdrop.topAnchor.constraint(equalTo: view.topAnchor),
-            kbBackdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-        ])
+        if Self.flatStyleIOS18 {                                    // §146 iOS18 扁平實色版：實心底，不用 UIInputView 半透材質
+            view.backgroundColor = KBColor.flatBg
+        } else {
+            view.backgroundColor = .clear                           // 底改由系統鍵盤底材提供（§105 native 方式）
+            kbBackdrop.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(kbBackdrop)                             // 系統鍵盤底材：同原廠材質、自動深淺/半透、填滿整框
+            NSLayoutConstraint.activate([
+                kbBackdrop.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                kbBackdrop.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                kbBackdrop.topAnchor.constraint(equalTo: view.topAnchor),
+                kbBackdrop.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            ])
+        }
         if isOS26 {                                                  // 上緣圓角僅 iOS 26（§94）；16–18 方正貼原廠
             view.layer.cornerRadius = 26                             // 原廠量測 ~26pt 視覺（§102）
             view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
