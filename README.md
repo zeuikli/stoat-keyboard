@@ -1,11 +1,11 @@
 # Stoat 白鼬注音
 
-iOS 自製**注音輸入法**——以自建 `librime.xcframework` 為引擎，從 macOS Squirrel SPEC 移植，內建洋蔥純注音詞庫，主打「貼近 Apple 原廠手感 ＋ RIME 強大選字」。
+iOS 自製**注音輸入法**——以自建 `librime.xcframework` 為引擎，從 macOS Squirrel SPEC 移植，詞庫引用**洋蔥純注音**與**洋蔥 Plus**（[oniondelta / Onion_Rime_Files](https://github.com/oniondelta/Onion_Rime_Files)），主打「貼近 Apple 原廠手感 ＋ RIME 強大選字」。
 
 - **Bundle**：`com.frost.stoat`（鍵盤 `com.frost.stoat.keyboard`）
 - **平台**：iOS 16.0+（iOS 26 視覺特性自動加載）
 - **引擎**：librime（自建 xcframework，含 librime-lua + octagram + predict）
-- **詞庫**：Onion 純注音 `bopomo_onion.schema.yaml`，預編譯 `.bin` 隨 App 打包
+- **詞庫**：洋蔥純注音 `bopomo_onion.schema.yaml` + 洋蔥 Plus 擴充詞組（phrases.chtp），預編譯 `.bin` 隨 App 打包
 
 ---
 
