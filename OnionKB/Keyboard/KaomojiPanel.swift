@@ -5,6 +5,9 @@ final class KaomojiPanel: UIView, UICollectionViewDataSource, UICollectionViewDe
     var onInsert: ((String) -> Void)?
     var onClose: (() -> Void)?
     var onDelete: (() -> Void)?
+    /// §180 返回鍵文字依來源模式：注音來→「注」、英文來→「ABC」（呼叫端設定）。
+    var backTitle: String = "ABC" { didSet { abcButton.setTitle(backTitle, for: .normal) } }
+    private let abcButton = UIButton(type: .system)
 
     private let chipScroll = UIScrollView()
     private let chipStack = UIStackView()
@@ -44,9 +47,9 @@ final class KaomojiPanel: UIView, UICollectionViewDataSource, UICollectionViewDe
             b.addAction(UIAction { [weak self] _ in self?.selectGroup(i) }, for: .touchUpInside)
             chipStack.addArrangedSubview(b)
         }
-        // 底列：ABC（左）· 分類 chips · ⌫（右）——比照原廠 emoji 鍵盤（§61）
-        let abc = UIButton(type: .system)
-        abc.setTitle("ABC", for: .normal)
+        // 底列：返回（左，注/ABC 依來源）· 分類 chips · ⌫（右）——比照原廠 emoji 鍵盤（§61）
+        let abc = abcButton                                     // §180 屬性化：呼叫端可改 backTitle
+        abc.setTitle(backTitle, for: .normal)
         abc.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
         abc.setTitleColor(.label, for: .normal)
         abc.addAction(UIAction { [weak self] _ in self?.onClose?() }, for: .touchUpInside)

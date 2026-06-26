@@ -45,7 +45,7 @@ enum KBSettings {
     // 鍵盤高度（§24 #5）
     static let minHeight: CGFloat = 250      // §139 R2：對標原廠下修（原 280）
     static let maxHeight: CGFloat = 480
-    static let defaultHeight: CGFloat = 340  // §142：數字列關後 5 列，回升至 340 讓鍵 ≈48pt 對標原廠（325 時僅 45pt 略小）
+    static let defaultHeight: CGFloat = 308  // §157：再下修至 308 → rowH ≈42.2pt 貼原廠 ~42（§156 315 仍略高）
     private static let kHeight = "keyboardHeight"
 
     static var keyboardHeight: CGFloat {

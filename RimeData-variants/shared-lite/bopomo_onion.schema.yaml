@@ -166,6 +166,13 @@ speller:
     - xform|^＊([ZCSrzcsiuvaoeEAIOUMNKGR])$|$1 | #\x31=數字1
     - xform|^＊＊|| #開頭「＊＊」使注音文不被前面縮略，該正則回復
 ##########注音聲韻母亂序##########
+    - derive/^([bpmfdtnlgkhjqxZCSrzcs])([iuv])/$2$1/
+    - derive/^([iuv])([aoeEAIOUMNKG])/$2$1/ #[R]
+    - derive/^([bpmfdtnlgkhjqxZCSrzcs])([aoeEAIOUMNKG])/$2$1/ #[R]
+    - derive/^([bpmfdtnlgkhjqxZCSrzcs])([iuv])([aoeEAIOUMNKG])/$3$2$1/ #[R]
+    - derive/^([bpmfdtnlgkhjqxZCSrzcs])([iuv])([aoeEAIOUMNKG])/$3$1$2/ #[R]
+    - derive/^([bpmfdtnlgkhjqxZCSrzcs])([iuv])([aoeEAIOUMNKG])/$2$3$1/ #[R]
+    - derive/^([bpmfdtnlgkhjqxZCSrzcs])([iuv])([aoeEAIOUMNKG])/$1$3$2/ #[R]
     - 'xlit|bpmfdtnlgkhjqxZCSrzcsiuvaoeEAIOUMNKGR12345|1qaz2wsxedcrfv5tgbyhnujm8ik,9ol.0p;/- 6347|'
 ################################### 主翻譯器 ###################################
 translator:

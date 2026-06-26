@@ -7,7 +7,7 @@ enum RimePaths {
     }
     /// 源 schema/dict（bundle，唯讀）。
     static var sharedDir: String? { bundleRimeData?.appendingPathComponent("shared").path }
-    /// 預編譯 .bin（bundle，唯讀，§5.8）。
+    /// 預編譯 .bin（bundle，唯讀，§5.8）。純注音/Plus 為分別打包的變體（§139：即時切換出字異常 → 退回拆開）。
     static var prebuiltDir: String? { bundleRimeData?.appendingPathComponent("build").path }
 
     /// userdb / 自訂詞庫目錄。優先 App Group（容器 App 必有；鍵盤需 Full Access）→ 可共享/可見；
