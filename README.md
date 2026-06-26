@@ -2,6 +2,10 @@
 
 iOS 自製**注音輸入法**——以自建 `librime.xcframework` 為引擎，從 macOS Squirrel SPEC 移植，詞庫引用**洋蔥純注音**與**洋蔥 Plus**（[oniondelta / Onion_Rime_Files](https://github.com/oniondelta/Onion_Rime_Files)），主打「貼近 Apple 原廠手感 ＋ RIME 強大選字」。
 
+<p align="center">
+  <img src="docs/screenshot-app.png" alt="Stoat 白鼬注音 容器 App 設定畫面" width="300">
+</p>
+
 - **Bundle**：`com.frost.stoat`（鍵盤 `com.frost.stoat.keyboard`）
 - **平台**：iOS 16.0+（iOS 26 視覺特性自動加載）
 - **引擎**：librime（自建 xcframework，含 librime-lua + octagram + predict）
