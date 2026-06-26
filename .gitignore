@@ -21,3 +21,6 @@ Payload/
 # 變體 build（由 OnionKB/Scripts/select-variant.sh 從 build-full/ build-lite/ 生成，§131）
 /RimeData/build/
 /RimeData/shared/
+
+# SPEC-iOS.md 為開發內部文件，不公開（rimeless dev 為真相源）
+SPEC-iOS.md

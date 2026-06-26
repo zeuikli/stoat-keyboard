@@ -2,7 +2,7 @@
 
 iOS 自製注音鍵盤（自建 librime.xcframework，從 macOS Squirrel SPEC 移植）。
 本檔依時序由舊到新，每個里程碑附一條 Debug／設計 Insight。
-真相來源：`SPEC-iOS.md`（章節 § 為錨；早期無逐版 build 號，最近四版標實際版本）。
+（內文 § 編號為開發里程碑錨點；早期無逐版 build 號，最近數版標實際版本。）
 
 ---
 
