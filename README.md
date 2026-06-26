@@ -3,8 +3,11 @@
 iOS 自製**注音輸入法**——以自建 `librime.xcframework` 為引擎，從 macOS Squirrel SPEC 移植，詞庫引用**洋蔥純注音**與**洋蔥 Plus**（[oniondelta / Onion_Rime_Files](https://github.com/oniondelta/Onion_Rime_Files)），主打「貼近 Apple 原廠手感 ＋ RIME 強大選字」。
 
 <p align="center">
-  <img src="docs/screenshot-app.png" alt="Stoat 白鼬注音 容器 App 設定畫面" width="300">
+  <img src="docs/screenshot-keyboard.png" alt="Stoat 注音鍵盤實際運作（內嵌組字 + 候選列）" width="280">
+  &nbsp;&nbsp;
+  <img src="docs/screenshot-app.png" alt="Stoat 容器 App 設定畫面" width="280">
 </p>
+<p align="center"><sub>左：注音鍵盤實際運作（內嵌組字「ㄋㄧ」→ 候選 你/尼/妳/呢…）　右：容器 App 設定</sub></p>
 
 - **Bundle**：`com.frost.stoat`（鍵盤 `com.frost.stoat.keyboard`）
 - **平台**：iOS 16.0+（iOS 26 視覺特性自動加載）
