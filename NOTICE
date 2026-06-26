@@ -38,9 +38,15 @@ Third-party components 第三方元件
    - default.yaml, key_bindings.yaml   RIME 預設設定衍生                          ⚠ 授權待確認
    - predict_office.db                 預測詞庫                                   ⚠ 來源/授權待確認
 
-4. 洋蔥純注音詞庫（bopomo_onion.*：schema / dict / phrase）
-   - 來源：洋蔥（Onion）注音方案                                                  ⚠ 授權與出處待確認
-   - 說明：本鍵盤的注音 schema 與詞庫基礎。散佈前務必確認其授權與署名要求。
+4. 洋蔥注音詞庫（bopomo_onion.*：schema / dict / phrase；含「純注音」與「Plus」兩來源）
+   - 來源：https://github.com/oniondelta/Onion_Rime_Files （洋蔥 Onion 注音方案）
+   - 範圍：純注音核心 schema／字詞庫 ＋ 洋蔥 Plus 擴充詞組（phrases.chtp，約 81 萬詞）。
+     本鍵盤詞庫變體：lite＝純注音核心；full／plustrim＝再含洋蔥 Plus 擴充。
+   - 授權：上游無正式 LICENSE 檔；作者於專案 README 首段明示
+     「※ 請勿使用於商業營利相關行為」（非商業 non-commercial）。
+   - ⚠ 重要：此「非商業」條款獨立適用於詞庫資料（RimeData/、RimeData-variants/）。
+     詞庫為資料檔、以聚合（aggregate）形式隨附、不與 GPL-3.0 程式連結；惟散佈／使用本鍵盤的
+     詞庫部分不得用於商業營利。如需商業用途，請先取得洋蔥作者授權，或改用無此限制之詞庫。
 
 5. 其他資料
    - kaomoji.json、han2code.json、bopomo_onion_symbols.yaml 等：若取自外部來源，
@@ -51,6 +57,8 @@ Third-party components 第三方元件
 ----------------------
 - [ ] 確認上方標 ⚠ 的元件授權，補齊各自的 LICENSE / 出處 / 署名。
 - [ ] 確認所有 bundled 資料的授權與 GPL-3.0 相容（若有 GPL 元件，整體散佈須 GPL）。
+- [ ] **洋蔥詞庫為「非商業」授權**（見上 #4）：本鍵盤的詞庫部分不得用於商業營利。
+      若要商業散佈，須移除／替換洋蔥詞庫，或先取得洋蔥作者授權。
 - [ ] 若不想散佈預編譯 librime 二進位（ios-build/out/*.a，約 28MB），改放 Releases 或
       由使用者自行依 ios-build/ 流程建置。
 - [ ] 把本檔與 LICENSE 一併保留於散佈物中。
