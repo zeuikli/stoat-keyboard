@@ -74,6 +74,41 @@ enum KBColor {
     static let candHighlight = UIColor { $0.userInterfaceStyle == .dark ? UIColor.systemGray3.resolvedColor(with: $0) : .white }
 }
 
+/// 展開候選格的可重用 cell（§89 標準解：UICollectionView 虛擬化）。原本 eager
+/// 建最多 200 顆 UIButton 塞進巢狀 UIStackView → tap 展開時主執行緒一次建完 +
+/// 解 ~400 條約束 = 卡。改用 collection view：只渲染可見 ~12–18 顆 cell、捲動重用。
+final class ExpandedCandCell: UICollectionViewCell {
+    static let reuseID = "ExpandedCandCell"
+    let label = UILabel()
+    private let hairline = UIView()
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        label.textAlignment = .center
+        label.textColor = .label
+        label.adjustsFontSizeToFitWidth = true          // 長詞縮放不溢出欄（§91）
+        label.minimumScaleFactor = 0.6
+        label.lineBreakMode = .byClipping
+        label.translatesAutoresizingMaskIntoConstraints = false
+        hairline.backgroundColor = .separator           // 列間細橫線（原廠分隔，§91）
+        hairline.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(label)
+        contentView.addSubview(hairline)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 2),
+            label.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -2),
+            label.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            hairline.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            hairline.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            hairline.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            hairline.heightAnchor.constraint(equalToConstant: 0.5),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) not used") }
+    override var isHighlighted: Bool {                   // 按下淡灰（動態，§99）
+        didSet { contentView.backgroundColor = isHighlighted ? .systemFill : .clear }
+    }
+}
+
 /// 注音鍵盤主控制器（SPEC §7.2 / §15.3 / §24 / §27）。
 /// 真 librime 驅動：大千鍵 → keycode → librime → 組字/候選/上字。
 /// 選項（半全/標點/簡繁）移到容器 App 設定（§27 #1）；中/英為功能列快切鍵。
@@ -103,7 +138,9 @@ final class KeyboardViewController: UIInputViewController {
     private var rootStack: UIStackView!                            // topBar + keyRowsStack（展開面板需插入，§89）
     private var rootTopConstraint: NSLayoutConstraint?             // §153 rootStack 頂部約束（候選列隱藏時加大頂部留白，免上緣裁切）
     private let expandButton = UIButton(type: .system)             // 候選展開/收合 chevron（§89）
-    private var expandedPanel: UIScrollView?                       // 展開候選格面板（§89）
+    private var expandedPanel: UIScrollView?                       // 展開候選格面板（§89；UICollectionView 即 UIScrollView 子類）
+    private var expandedCands: [(abs: Int, text: String)] = []     // 展開面板資料源（絕對索引 + 文字）
+    private var expandedFont = UIFont.systemFont(ofSize: 22)       // 本輪展開的候選字型（cellForItem 用）
     private var isExpanded = false
     private let kbBackdrop = UIInputView(frame: .zero, inputViewStyle: .keyboard)   // 官方系統鍵盤底材（§105 native 方式）
     /// §146 建置變體旗標：true＝iOS 18 扁平實色版（實心底，非半透材質），出 ios18 IPA 時翻 true。
@@ -1325,82 +1362,37 @@ final class KeyboardViewController: UIInputViewController {
         let cands = engine.allCandidates().enumerated().filter { Self.isRenderable($0.element.text) }
         guard !cands.isEmpty else { return }
 
-        let scroll = UIScrollView()
-        scroll.showsVerticalScrollIndicator = true
-        scroll.alwaysBounceVertical = true
-        scroll.setContentHuggingPriority(UILayoutPriority(1), for: .vertical)   // 吃彈性高度，與 keyRowsStack 一致（§59）
+        expandedCands = cands.map { (abs: $0.offset, text: $0.element.text) }
+        expandedFont = UIFont.systemFont(ofSize: 22 * fontScale)
 
-        let vstack = UIStackView()
-        vstack.axis = .vertical
-        vstack.spacing = 0                                       // 列距由分隔線處理（§91）
-        vstack.translatesAutoresizingMaskIntoConstraints = false
-        scroll.addSubview(vstack)
-
-        let font = UIFont.systemFont(ofSize: 22 * fontScale)
         let avail = view.bounds.width - 16
         let cols = max(5, min(7, Int(avail / 62)))               // 等寬欄（原廠約 6 欄，§91）
-        let cellW = avail / CGFloat(cols)
-        let arr = Array(cands)
-        var i = 0
-        while i < arr.count {
-            let rowStack = UIStackView()
-            rowStack.axis = .horizontal
-            rowStack.spacing = 0
-            rowStack.distribution = .fill
-            var placed = 0
-            while placed < cols, i < arr.count {
-                let (absIdx, cand) = arr[i]
-                rowStack.addArrangedSubview(expandedCandButton(cand.text, absoluteIndex: absIdx, font: font, width: cellW))
-                placed += 1; i += 1
-            }
-            if placed < cols {                                   // 末列補 spacer 維持左對齊
-                let spacer = UIView()
-                spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-                rowStack.addArrangedSubview(spacer)
-            }
-            vstack.addArrangedSubview(rowStack)
-            if i < arr.count {                                   // 列間細橫線（原廠分隔，§91）
-                let sep = UIView()
-                sep.backgroundColor = .separator
-                sep.heightAnchor.constraint(equalToConstant: 0.5).isActive = true
-                vstack.addArrangedSubview(sep)
-            }
-        }
 
-        NSLayoutConstraint.activate([
-            vstack.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor, constant: 8),
-            vstack.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor, constant: -8),
-            vstack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 4),
-            vstack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -4),
-            vstack.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor, constant: -16),
-        ])
+        // 標準解（§89）：UICollectionView + 等寬 cols 欄 compositional layout。
+        // 只渲染可見 cell、捲動重用 → 不再 eager 建 200 顆 button + 解約束。
+        let item = NSCollectionLayoutItem(layoutSize: .init(
+            widthDimension: .fractionalWidth(1.0), heightDimension: .fractionalHeight(1.0)))
+        let group = NSCollectionLayoutGroup.horizontal(layoutSize: .init(
+            widthDimension: .fractionalWidth(1.0), heightDimension: .absolute(46)),
+            subitem: item, count: cols)
+        let section = NSCollectionLayoutSection(group: group)
+        section.contentInsets = .init(top: 4, leading: 8, bottom: 4, trailing: 8)
+        let layout = UICollectionViewCompositionalLayout(section: section)
+
+        let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        cv.backgroundColor = .clear
+        cv.alwaysBounceVertical = true
+        cv.showsVerticalScrollIndicator = true
+        cv.setContentHuggingPriority(UILayoutPriority(1), for: .vertical)   // 吃彈性高度（§59）
+        cv.register(ExpandedCandCell.self, forCellWithReuseIdentifier: ExpandedCandCell.reuseID)
+        cv.dataSource = self
+        cv.delegate = self
 
         keyRowsStack.isHidden = true
-        rootStack.addArrangedSubview(scroll)
-        expandedPanel = scroll
+        rootStack.addArrangedSubview(cv)
+        expandedPanel = cv
         isExpanded = true
         expandButton.setImage(UIImage(systemName: "chevron.up"), for: .normal)
-    }
-
-    private func expandedCandButton(_ text: String, absoluteIndex: Int, font: UIFont, width: CGFloat) -> UIButton {
-        let b = KeyButton(frame: .zero)
-        b.setTitle(text, for: .normal)
-        b.titleLabel?.font = font
-        b.titleLabel?.adjustsFontSizeToFitWidth = true           // 長詞縮放不溢出欄（§91）
-        b.titleLabel?.minimumScaleFactor = 0.6
-        b.titleLabel?.lineBreakMode = .byClipping
-        b.setTitleColor(.label, for: .normal)
-        b.backgroundColor = .clear                               // 原廠扁平無框（§91）
-        b.restingColor = .clear
-        b.pressedColor = .systemFill                             // 按下淡灰（動態、非白框，§99）
-        b.widthAnchor.constraint(equalToConstant: width).isActive = true
-        b.heightAnchor.constraint(equalToConstant: 46).isActive = true
-        b.addAction(UIAction { [weak self] _ in
-            guard let self else { return }
-            self.apply(self.engine.selectCandidateAbsolute(absoluteIndex))
-            if self.isExpanded { self.collapseExpanded() }   // 選字後收合回候選列（§89）
-        }, for: .touchUpInside)
-        return b
     }
 
     /// 字形可顯示性檢測（§69）：任一字落到 LastResort 字型＝tofu → 不可顯示。per-scalar 快取。
@@ -1473,4 +1465,23 @@ final class KeyboardViewController: UIInputViewController {
 // §154 點擊音效：回傳 true 後 playInputClick() 才會發聲（不需 Full Access）。
 extension KeyboardViewController: UIInputViewAudioFeedback {
     var enableInputClicksWhenVisible: Bool { true }
+}
+
+// §89 展開候選格資料源：UICollectionView 虛擬化，cell 重用、只渲染可見範圍。
+extension KeyboardViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        expandedCands.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ExpandedCandCell.reuseID, for: indexPath) as! ExpandedCandCell
+        cell.label.font = expandedFont
+        cell.label.text = expandedCands[indexPath.item].text
+        return cell
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        apply(engine.selectCandidateAbsolute(expandedCands[indexPath.item].abs))
+        if isExpanded { collapseExpanded() }                 // 選字後收合回候選列（§89）
+    }
 }
