@@ -915,7 +915,7 @@ final class KeyboardViewController: UIInputViewController {
             if let sym = BopomoLayout.numberSymbols[d] {
                 let lbl = UILabel()
                 lbl.text = sym
-                lbl.font = .systemFont(ofSize: 10 * fontScale, weight: .medium)
+                lbl.font = .systemFont(ofSize: 7 * fontScale, weight: .regular)   // §45 數字列角標：與注音英文提示同尺寸（不遮數字）
                 lbl.textColor = .systemGray
                 lbl.translatesAutoresizingMaskIntoConstraints = false
                 b.addSubview(lbl)
@@ -1054,7 +1054,7 @@ final class KeyboardViewController: UIInputViewController {
         b.titleLabel?.font = .systemFont(ofSize: 25 * fontScale, weight: .light)   // §142 注音對標原廠細筆畫（英文/123 維持 regular）
         let eng = UILabel()
         eng.text = key.englishLabel
-        eng.font = .systemFont(ofSize: 10 * fontScale, weight: .medium)
+        eng.font = .systemFont(ofSize: 7 * fontScale, weight: .regular)   // §48 小角標：對標原廠/Gboard，不遮注音（IMG_2235 參考）
         eng.textColor = .systemGray
         eng.isHidden = !localOpt(Self.engHintKey)        // 預設純原廠；提示開關控制（§48）
         eng.translatesAutoresizingMaskIntoConstraints = false
@@ -1096,7 +1096,7 @@ final class KeyboardViewController: UIInputViewController {
                 eng.isHidden = !localOpt(Self.engHintKey)              // 純原廠時隱藏（§48）
                 eng.text = key.englishLabel
                 eng.textColor = .systemGray
-                eng.font = .systemFont(ofSize: 10 * fontScale, weight: .medium)
+                eng.font = .systemFont(ofSize: 7 * fontScale, weight: .regular)   // §48 小角標：對標原廠/Gboard，不遮注音（IMG_2235 參考）
             }
         }
         cnEnButton?.setTitle(english ? "英" : "中", for: .normal)
