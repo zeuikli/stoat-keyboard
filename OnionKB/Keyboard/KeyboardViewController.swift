@@ -1147,7 +1147,7 @@ final class KeyboardViewController: UIInputViewController {
             textDocumentProxy.insertText(typeUppercase ? key.swipeUpper : key.swipeLower)
             if shiftState == .shifted { shiftState = .off; updateModeStyling() }
         } else {
-            apply(engine.processKey(key.code))
+            applyTwoPhase(engine.processKeyPreedit(key.code))   // §200 二階段：組字字母即時、候選(grammar) async
         }
     }
 
@@ -1313,8 +1313,38 @@ final class KeyboardViewController: UIInputViewController {
         textDocumentProxy.unmarkText()
     }
 
+    private var inputSeq = 0                                       // §200 二階段候選 async 排序：同步 refresh/新鍵使 pending async 失效
+
     private func refresh(_ update: RimeUpdate) {
-        currentCandidates = update.candidates
+        inputSeq += 1                                              // §200 同步刷新 → 丟棄任何 pending async 候選（防舊鍵候選蓋掉新狀態）
+        displayPreedit(update)
+        displayCandidates(update.candidates, preeditEmpty: update.preedit.isEmpty)
+    }
+
+    /// §200 二階段 phase1：只更新組字 preedit（marked text）+ return 鍵——便宜、立即，不碰候選列、不算 grammar。
+    private func applyTwoPhase(_ p1: RimeUpdate) {
+        if let commit = p1.commit, !commit.isEmpty {              // commit 立即上字（同 apply）
+            if useMarkedText {
+                textDocumentProxy.setMarkedText(commit, selectedRange: NSRange(location: (commit as NSString).length, length: 0))
+                textDocumentProxy.unmarkText()
+                hasMarkedText = false; markedLen = 0
+            } else {
+                textDocumentProxy.insertText(commit)
+            }
+        }
+        displayPreedit(p1)                                        // 組字字母即時顯示
+        // phase2：候選（grammar，貴）async 延到下一個 runloop → 移出感知關鍵路徑；過時則丟棄。
+        inputSeq += 1
+        let seq = inputSeq
+        let preeditEmpty = p1.preedit.isEmpty
+        DispatchQueue.main.async { [weak self] in
+            guard let self, seq == self.inputSeq else { return }  // 更新的鍵/動作已到 → 丟棄舊候選
+            self.displayCandidates(self.engine.fetchCandidates(), preeditEmpty: preeditEmpty)
+        }
+    }
+
+    /// §200 phase1 顯示：組字 preedit（marked text 或候選列 label）+ return 鍵。不碰候選列。
+    private func displayPreedit(_ update: RimeUpdate) {
         preeditText = update.preedit.isEmpty ? " " : update.preedit             // §155 isPreeditEmpty 狀態來源（注音已內嵌輸入框）
         // §173 注音 preedit 顯示：內嵌 ON→輸入框(marked text)、隱藏候選列 label；OFF→候選列 label、不碰宿主（快）。
         if useMarkedText {
@@ -1332,9 +1362,14 @@ final class KeyboardViewController: UIInputViewController {
             compositionSepWrapRef?.isHidden = update.preedit.isEmpty   // §176 分隔線隨注音顯隱
         }
         styleReturnKey()                                         // 組字/清空→ return 灰↔藍即時更新（§110）
+    }
+
+    /// §200 phase2 顯示：候選列（含 grammar 結果）。二階段時 async 延後。
+    private func displayCandidates(_ candidates: [Candidate], preeditEmpty: Bool) {
+        currentCandidates = candidates
         // §194 候選列 in-place 更新（對標原廠 reuse、減 per-keystroke stack churn）：
         // idle/清空走全清+快捷符號；候選→候選只重用既有 CandButton、不整列拆掉重排（避免每鍵 stack relayout）。
-        if update.candidates.isEmpty && update.preedit.isEmpty {
+        if candidates.isEmpty && preeditEmpty {
             candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
             if isExpanded { collapseExpanded() }                 // 組字清空→自動收合展開面板（§89）
             showQuickSymbols()                                   // 無組字→常用符號/顏文字（§35 #1）
@@ -1342,10 +1377,10 @@ final class KeyboardViewController: UIInputViewController {
         }
         // 只清非候選殘留（快捷符號/英文鈕）；池中 CandButton 原位保留重用
         candidateStack.arrangedSubviews.forEach { if !($0 is CandButton) { $0.removeFromSuperview() } }
-        var didHighlight = update.preedit.isEmpty                   // §150 預測候選（輸入完、preedit 空）不高亮，比照原廠（圖3）；組字中才 pill
+        var didHighlight = preeditEmpty                            // §150 預測候選（輸入完、preedit 空）不高亮，比照原廠（圖3）；組字中才 pill
         var slot = 0                                                // §164 候選鈕 pool 索引
         let font = UIFont.systemFont(ofSize: 22 * fontScale)
-        for (i, cand) in update.candidates.enumerated() {
+        for (i, cand) in candidates.enumerated() {
             guard Self.isRenderable(cand.text) else { continue }   // 過濾生僻字 tofu（§69）；保留原 index
             let b = candButton(slot); slot += 1                    // §164 重用，不每鍵新配置
             if b.superview == nil { candidateStack.addArrangedSubview(b) }   // §194 既有原位重用、不在列才加（順序隨 slot 遞增穩定）

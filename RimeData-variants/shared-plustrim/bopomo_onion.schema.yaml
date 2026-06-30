@@ -560,9 +560,9 @@ predictor:
   db: predict_office.db
   max_candidates: 5
   max_iterations: 1
-# §199 暫關 octagram grammar 測輸入延遲（rime 最重每鍵運算；§192 variant_normalize 已保證爲→為，grammar 主要用途已被取代）。可逆：取消註解即復原。
-# grammar:
-#   language: zh-hant-t-essay-bgc
+# §200 grammar 復原：二階段顯示（candidates async）已把 grammar 移出感知關鍵路徑，組字字母即時顯示、保留越打越準。
+grammar:
+  language: zh-hant-t-essay-bgc
 
 # === OnionKB 表情候選（§138 #2）===
 emoji:

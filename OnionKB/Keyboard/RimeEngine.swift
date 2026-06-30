@@ -17,6 +17,10 @@ struct RimeUpdate {
 protocol RimeEngine: AnyObject {
     var isReady: Bool { get }
     func processKey(_ keycode: Int32) -> RimeUpdate
+    /// §200 二階段 phase1：送鍵 + 取 commit + 組字 preedit（**不算候選**＝不觸發 get_context 翻譯/grammar，便宜立即）。
+    func processKeyPreedit(_ keycode: Int32) -> RimeUpdate
+    /// §200 二階段 phase2：當前候選（觸發 get_context → 翻譯 + octagram grammar，昂貴 → 由 UI async 延後）。
+    func fetchCandidates() -> [Candidate]
     func selectCandidate(_ index: Int) -> RimeUpdate
     func allCandidates() -> [Candidate]                       // 全候選（展開面板，§89）
     func selectCandidateAbsolute(_ index: Int) -> RimeUpdate  // 絕對索引選字（展開面板，§89）
@@ -40,6 +44,10 @@ final class RimeEngineStub: RimeEngine {
         return RimeUpdate(preedit: buffer,
                           candidates: buffer.isEmpty ? [] : [Candidate(text: "（無引擎）", comment: nil)],
                           commit: nil)
+    }
+    func processKeyPreedit(_ keycode: Int32) -> RimeUpdate { processKey(keycode) }   // stub：無二階段差異
+    func fetchCandidates() -> [Candidate] {
+        buffer.isEmpty ? [] : [Candidate(text: "（無引擎）", comment: nil)]
     }
     func selectCandidate(_ index: Int) -> RimeUpdate {
         let t = buffer; buffer = ""

@@ -21,6 +21,19 @@ final class RimeEngineLibrime: RimeEngine {
         return snapshot()
     }
 
+    /// §200 phase1：送鍵 + commit + preedit，**不呼叫 candidates()**（不觸發 get_context 翻譯/grammar）→ 便宜立即。
+    func processKeyPreedit(_ keycode: Int32) -> RimeUpdate {
+        bridge.processKey(keycode)
+        let commit = bridge.takeCommit()
+        let preedit = BopomoLayout.bopomoPreedit(fromInput: bridge.rawInput())
+        return RimeUpdate(preedit: preedit, candidates: [], commit: commit)
+    }
+
+    /// §200 phase2：當前候選（get_context → 翻譯 + grammar，昂貴）。
+    func fetchCandidates() -> [Candidate] {
+        bridge.candidates().map { Candidate(text: $0.text, comment: $0.comment) }
+    }
+
     func selectCandidate(_ index: Int) -> RimeUpdate {
         bridge.selectCandidate(Int32(index))
         return snapshot()
