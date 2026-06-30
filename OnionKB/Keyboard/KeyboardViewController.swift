@@ -1314,18 +1314,24 @@ final class KeyboardViewController: UIInputViewController {
             compositionSepWrapRef?.isHidden = update.preedit.isEmpty   // §176 分隔線隨注音顯隱
         }
         styleReturnKey()                                         // 組字/清空→ return 灰↔藍即時更新（§110）
-        candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        // §194 候選列 in-place 更新（對標原廠 reuse、減 per-keystroke stack churn）：
+        // idle/清空走全清+快捷符號；候選→候選只重用既有 CandButton、不整列拆掉重排（避免每鍵 stack relayout）。
         if update.candidates.isEmpty && update.preedit.isEmpty {
+            candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
             if isExpanded { collapseExpanded() }                 // 組字清空→自動收合展開面板（§89）
             showQuickSymbols()                                   // 無組字→常用符號/顏文字（§35 #1）
             return
         }
+        // 只清非候選殘留（快捷符號/英文鈕）；池中 CandButton 原位保留重用
+        candidateStack.arrangedSubviews.forEach { if !($0 is CandButton) { $0.removeFromSuperview() } }
         var didHighlight = update.preedit.isEmpty                   // §150 預測候選（輸入完、preedit 空）不高亮，比照原廠（圖3）；組字中才 pill
         var slot = 0                                                // §164 候選鈕 pool 索引
         let font = UIFont.systemFont(ofSize: 22 * fontScale)
         for (i, cand) in update.candidates.enumerated() {
             guard Self.isRenderable(cand.text) else { continue }   // 過濾生僻字 tofu（§69）；保留原 index
             let b = candButton(slot); slot += 1                    // §164 重用，不每鍵新配置
+            if b.superview == nil { candidateStack.addArrangedSubview(b) }   // §194 既有原位重用、不在列才加（順序隨 slot 遞增穩定）
+            b.isHidden = false
             b.setTitle(cand.text, for: .normal)                    // 原廠候選無編號（§53）
             b.titleLabel?.font = font
             let idx = i
@@ -1341,7 +1347,10 @@ final class KeyboardViewController: UIInputViewController {
                 b.contentEdgeInsets = .zero
                 b.layer.cornerRadius = 0
             }
-            candidateStack.addArrangedSubview(b)
+        }
+        // §194 移除本輪未用到的多餘候選鈕（從尾端，維持 slot 順序）
+        while candidateStack.arrangedSubviews.count > slot {
+            candidateStack.arrangedSubviews.last?.removeFromSuperview()
         }
     }
 
