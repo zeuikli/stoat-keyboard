@@ -377,7 +377,7 @@ final class KeyboardViewController: UIInputViewController {
             }
         }
         // 移除「全形標點/字元」(fullShape) 與「英式標點」(asciiPunct)（§138 #1）；123 半全形改由「123 標點」子選單控制
-        var items: [UIMenuElement] = SchemaOption.allCases.filter { ![.asciiMode, .fullShape, .asciiPunct].contains($0) }.map { opt in
+        var items: [UIMenuElement] = SchemaOption.allCases.filter { ![.asciiMode, .fullShape, .asciiPunct, .simplification].contains($0) }.map { opt in
             toggle(opt.title, optKey(opt), localOpt(optKey(opt), default: opt.defaultOn)) { [weak self] v in
                 self?.engine.setOption(opt.rawValue, v)
                 if opt == .fullShape { self?.rebuildKeyRows() }   // 123 頁半全形即時更新（§71）
@@ -406,6 +406,12 @@ final class KeyboardViewController: UIInputViewController {
         items.append(toggle("注音內嵌輸入框（關＝顯候選列、較快）", Self.embeddedKey, localOpt(Self.embeddedKey, default: true)) { [weak self] _ in self?.embeddedModeChanged() })
         items.append(toggle("常駐數字列", Self.numberRowKey, localOpt(Self.numberRowKey, default: false)) { [weak self] _ in self?.rebuildKeyRows() })
         items.append(toggle("注音鍵英文提示", Self.engHintKey, localOpt(Self.engHintKey)) { [weak self] _ in self?.rebuildKeyRows() })
+        // §193 簡體輸出移出選單開頭：原為 SchemaOption 第一項＝⚙ 選單最靠近手指處→誤按即全文轉简体（後果重）。
+        // 改插中段，遠離錨點邊緣的危險位。
+        items.append(toggle(SchemaOption.simplification.title, optKey(.simplification),
+                            localOpt(optKey(.simplification), default: SchemaOption.simplification.defaultOn)) { [weak self] v in
+            self?.engine.setOption(SchemaOption.simplification.rawValue, v)
+        })
         // 第一列固定（§130）：標點 / 顏文字各自決定是否顯示
         items.append(toggle("第一列標點", Self.quickPunctKey, localOpt(Self.quickPunctKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         items.append(toggle("第一列顏文字", Self.quickKaomojiKey, localOpt(Self.quickKaomojiKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })

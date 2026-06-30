@@ -35,6 +35,9 @@ switches:
   - name: prediction
     reset: 1
     states: [ 關閉預測, 開啓預測 ]
+  - name: variant_normalize
+    reset: 1
+    states: [ 原字形, 通行 ]
 
 engine:
   filters:
@@ -42,6 +45,7 @@ engine:
 #     - charset_filter@gbk
     - simplifier@zh_cn
     - simplifier@emoji
+    - simplifier@variant_normalize
     - reverse_lookup_filter@bpm_reverse_lookup
     - uniquifier
   processors:
@@ -566,3 +570,11 @@ emoji:
   tips: none
   inherit_comment: false
   tags: [ abc ]
+
+# === OnionKB 古體字/異體字→通行字正規化（terra 作者「修改為後者」清單，always-on）===
+variant_normalize:
+  opencc_config: variant_normalize.json
+  option_name: variant_normalize
+  tips: none
+  inherit_comment: false
+  tags: [ abc, prediction ]
