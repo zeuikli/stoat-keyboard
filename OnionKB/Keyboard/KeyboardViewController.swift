@@ -214,6 +214,10 @@ final class KeyboardViewController: UIInputViewController {
             applyHeight()
             view.layoutIfNeeded()
         }
+        // §191 回前景重建玻璃：背景化時系統把 UIVisualEffect 剝離做 snapshot，
+        // extension 不保證自動還原 → 同外觀 App 切換回來玻璃鍵帽消失成裸字灰底。
+        // §190 只修深淺切換 trait 路徑；此處補同外觀切換/resume 路徑（view 已 attach，guard 會通過）。
+        if #available(iOS 26.0, *), useGlassKeys { buildGlassLayer() }
     }
 
     override func viewWillAppear(_ animated: Bool) {
