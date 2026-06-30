@@ -551,7 +551,9 @@ final class KeyboardViewController: UIInputViewController {
     /// row1(11鍵)滿版、row2/3(10鍵)置中內縮半鍵 → 各列鍵同寬、欄位對齊（修「右邊不平衡」）。
     private func uniformRow(_ keys: [UIView], shiftFraction: CGFloat = 0, widthInset: CGFloat = 0) -> UIView {
         let row = UIStackView(arrangedSubviews: keys)
-        row.axis = .horizontal; row.spacing = 6; row.distribution = .fill
+        // §198 改 fillEqually：UIStackView 把鍵寬做像素分配（整數對齊），消除原 .fill + 分數寬約束 (W-60)/11
+        // 落在次像素邊界的 anti-alias 模糊/微錯位。鍵寬數學等同 gridW，僅整列寬+centerX 固定、鍵由 stack 像素均分。
+        row.axis = .horizontal; row.spacing = 6; row.distribution = .fillEqually
         row.translatesAutoresizingMaskIntoConstraints = false
         let container = UIView()
         container.addSubview(row)
@@ -561,10 +563,10 @@ final class KeyboardViewController: UIInputViewController {
         NSLayoutConstraint(item: row, attribute: .centerX, relatedBy: .equal,
                            toItem: container, attribute: .trailing,
                            multiplier: 0.5 + shiftFraction, constant: 0).isActive = true
-        for k in keys {
-            // §185 widthInset>0 收窄每鍵（整列變窄、左右同時內縮對齊原廠寬）
-            k.widthAnchor.constraint(equalTo: container.widthAnchor, multiplier: 1.0/11.0, constant: -60.0/11.0 - widthInset).isActive = true
-        }
+        // 整列寬 = n 鍵 grid：n*gridW + (n-1)*6 = W*(n/11) − 60n/11 + 6(n−1)（再扣 §185 widthInset*n）。
+        let n = CGFloat(keys.count)
+        row.widthAnchor.constraint(equalTo: container.widthAnchor, multiplier: n / 11.0,
+                                   constant: -60.0 * n / 11.0 + 6.0 * (n - 1) - widthInset * n).isActive = true
         return container
     }
 
@@ -601,13 +603,9 @@ final class KeyboardViewController: UIInputViewController {
             if showNumberRow { keyRowsStack.addArrangedSubview(uniformRow(numberRowKeys())) }
             for (i, row) in BopomoLayout.rows.enumerated() {
                 let notes = row.map { bopomoKey($0) }
-                if i == BopomoLayout.rows.count - 1 {            // 第4列：10 注音鍵 + ⌫（§182 撤 §178 lead：ㄈ 齊左對齊 ㄅ＝原廠；⌫ 維持 1.5× 好按，故右側略偏、注音鍵略窄於 grid）
-                    let del = backspaceKey()
-                    let r = UIStackView(arrangedSubviews: notes + [del])
-                    r.axis = .horizontal; r.spacing = 6; r.distribution = .fill
-                    for n in notes { n.widthAnchor.constraint(equalTo: notes[0].widthAnchor).isActive = true }
-                    del.widthAnchor.constraint(equalTo: notes[0].widthAnchor, multiplier: 1.5).isActive = true   // §166 ⌫ 1.5×（使用者選保留大）
-                    keyRowsStack.addArrangedSubview(r)
+                if i == BopomoLayout.rows.count - 1 {            // §197 第4列統一網格：10 注音 + ⌫ = 11 鍵 fillEqually（＝row1 同機制、同 gridW）
+                    // → 鍵欄與上三列精準對齊，撤 §166 ⌫1.5×（致 §182 注音鍵 (W-66)/11.5 略窄於 grid、逐格左漂＝微錯位根因）。
+                    keyRowsStack.addArrangedSubview(makeKeyRow(notes + [backspaceKey()]))
                 } else if i == 0 {
                     keyRowsStack.addArrangedSubview(makeKeyRow(notes))   // row1：11 鍵滿版（=網格基準寬）
                 } else if i == 1 {
