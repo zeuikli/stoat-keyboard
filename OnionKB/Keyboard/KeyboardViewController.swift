@@ -336,13 +336,21 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
     /// §195 glass-lite 鍵底色：半透明 tint（無 UIVisualEffectView），動態色、深淺自適應。
-    /// 無色＝比照非玻璃 content/func 基底；藍/灰/暖＝半透明 tint keycap、透出鍵盤底材＝近玻璃質感，
-    /// 但不會被 iOS26 snapshot 變灰（切 App 不破）、無 40 層 effect 合成（不卡）。alpha 為首版、可再調。
+    /// §196 玻璃風格在 glass-lite 改控制「透明度」：霜面＝高 alpha 較實心；透明＝低 alpha、透出底材＝玻璃透視感。
+    /// 無色＝比照非玻璃 content/func 基底（風格不影響）。alpha 可再調。
     private func glassLiteColor(prominent: Bool) -> UIColor {
+        let clear = localOpt(Self.glassStyleKey)   // true=透明（低 alpha）/ false=霜面（高 alpha）
+        // dyn(底色, 霜面淺, 霜面深, 透明淺, 透明深)
+        func dyn(_ c: UIColor, _ fl: CGFloat, _ fd: CGFloat, _ cl: CGFloat, _ cd: CGFloat) -> UIColor {
+            UIColor { tc in
+                let dark = tc.userInterfaceStyle == .dark
+                return c.resolvedColor(with: tc).withAlphaComponent(clear ? (dark ? cd : cl) : (dark ? fd : fl))
+            }
+        }
         switch localStore.integer(forKey: Self.glassTintKey) {
-        case 1: return UIColor { tc in UIColor.systemBlue.resolvedColor(with: tc).withAlphaComponent(tc.userInterfaceStyle == .dark ? 0.45 : 0.20) }
-        case 2: return UIColor { tc in UIColor.systemGray.resolvedColor(with: tc).withAlphaComponent(tc.userInterfaceStyle == .dark ? 0.50 : 0.30) }
-        case 3: return UIColor { tc in UIColor(red: 0.96, green: 0.86, blue: 0.70, alpha: 1).withAlphaComponent(tc.userInterfaceStyle == .dark ? 0.42 : 0.62) }   // 暖
+        case 1: return dyn(.systemBlue, 0.20, 0.45, 0.11, 0.26)
+        case 2: return dyn(.systemGray, 0.30, 0.50, 0.16, 0.30)
+        case 3: return dyn(UIColor(red: 0.96, green: 0.86, blue: 0.70, alpha: 1), 0.62, 0.42, 0.36, 0.26)   // 暖
         default: return prominent ? KBColor.funcKey : KBColor.contentKey   // 無色＝同非玻璃
         }
     }
