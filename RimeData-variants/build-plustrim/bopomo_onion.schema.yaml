@@ -97,8 +97,9 @@ engine:
     - punct_translator
     - "table_translator@custom_phrase"
     - script_translator
-grammar:
-  language: "zh-hant-t-essay-bgc"
+# §199 暫關 octagram grammar 測輸入延遲（可逆）
+# grammar:
+#   language: "zh-hant-t-essay-bgc"
 key_binder:
   bindings:
     - {accept: "Control+p", send: Up, when: composing}
