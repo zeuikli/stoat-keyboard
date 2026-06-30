@@ -335,6 +335,17 @@ final class KeyboardViewController: UIInputViewController {
         default: return nil
         }
     }
+    /// §195 glass-lite 鍵底色：半透明 tint（無 UIVisualEffectView），動態色、深淺自適應。
+    /// 無色＝比照非玻璃 content/func 基底；藍/灰/暖＝半透明 tint keycap、透出鍵盤底材＝近玻璃質感，
+    /// 但不會被 iOS26 snapshot 變灰（切 App 不破）、無 40 層 effect 合成（不卡）。alpha 為首版、可再調。
+    private func glassLiteColor(prominent: Bool) -> UIColor {
+        switch localStore.integer(forKey: Self.glassTintKey) {
+        case 1: return UIColor { tc in UIColor.systemBlue.resolvedColor(with: tc).withAlphaComponent(tc.userInterfaceStyle == .dark ? 0.45 : 0.20) }
+        case 2: return UIColor { tc in UIColor.systemGray.resolvedColor(with: tc).withAlphaComponent(tc.userInterfaceStyle == .dark ? 0.50 : 0.30) }
+        case 3: return UIColor { tc in UIColor(red: 0.96, green: 0.86, blue: 0.70, alpha: 1).withAlphaComponent(tc.userInterfaceStyle == .dark ? 0.42 : 0.62) }   // 暖
+        default: return prominent ? KBColor.funcKey : KBColor.contentKey   // 無色＝同非玻璃
+        }
+    }
     private static let engHintKey = "kbopt_engHint"
     private static let numberRowKey = "kbopt_numberRow"
     private static let quickPunctKey = "kbopt_quickPunct"       // 第一列標點段顯示（§121）
@@ -769,15 +780,16 @@ final class KeyboardViewController: UIInputViewController {
     /// 僅換底色、沿用 keyButton 既有圓角與 1px 細陰影，無系統材質＝無浮凸/無偏色。
     @available(iOS 26.0, *)
     private func applyGlass(_ b: UIButton, prominent: Bool) {
-        // 真 Liquid Glass（§97 官方容器，§141 啟用）：此處只「登記」，玻璃由 buildGlassLayer 統一建（風格/色調讀 kbopt）。
-        // 不覆寫字體 → 沿用 keyButton 25pt / bopomo .light / grayKey 16pt。
-        b.backgroundColor = .clear
-        b.layer.shadowOpacity = 0
-        if let k = b as? KeyButton {                          // 按壓回饋：clear 底上閃白
-            k.restingColor = .clear
-            k.pressedColor = UIColor.white.withAlphaComponent(0.4)
+        // §195 glass-lite：改半透明 tint 底（無 UIVisualEffectView）。
+        // 根因（SDK）：iOS 26 帶 tint 的 glass effect view 在系統 snapshot（切 App）渲染成純灰（已知 bug，
+        // swift-snapshot-testing#1019）→ 切 App 掉灰底；且 40 層 effect 合成＝卡頓（Apple「玻璃須節制」）。
+        // tint 動態色、深淺自適應 → 免 trait/resume 重建；不再登記 glassKeyButtons → buildGlassLayer 自動空轉（dormant）。
+        let fill = glassLiteColor(prominent: prominent)
+        b.backgroundColor = fill
+        if let k = b as? KeyButton {
+            k.restingColor = fill
+            k.pressedColor = KBColor.funcKeyPressed
         }
-        glassKeyButtons.append((b, prominent))
     }
 
     /// 官方 Liquid Glass 多元件正解（§97）：一個 UIGlassContainerEffect 容器，
