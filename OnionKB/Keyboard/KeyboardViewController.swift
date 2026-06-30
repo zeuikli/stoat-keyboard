@@ -774,8 +774,10 @@ final class KeyboardViewController: UIInputViewController {
     /// 各鍵 glass 巢狀進其 contentView 合併渲染；容器置按鈕之下，按鈕 clear 底→玻璃透出、label/icon 在上。
     @available(iOS 26.0, *)
     private func buildGlassLayer() {
-        teardownGlassLayer()
+        // §190 先檢查再拆：guard 失敗（view 脫離層級／無登記鍵）時保留現有玻璃，
+        // 不誤殺 → 修「trait 切換在 detached 時拆掉玻璃卻 return 不重建 → 鍵變裸字灰底」。
         guard useGlassKeys, let rs = rootStack, rs.superview != nil, !glassKeyButtons.isEmpty else { return }
+        teardownGlassLayer()
         let container = UIVisualEffectView(effect: UIGlassContainerEffect())
         container.isUserInteractionEnabled = false
         container.translatesAutoresizingMaskIntoConstraints = false
