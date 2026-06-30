@@ -1006,6 +1006,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func setMode(_ m: KBMode) {
+        inputSeq += 1                                  // §201 切模式使任何 pending 二階段候選 async 失效（防 bopomo phase2 蓋掉英/123 候選顯示）
         if isExpanded { collapseExpanded() }           // 切模式先收展開面板（§89）
         if m == .bopomo || m == .english { lastLetterMode = m }
         if m == .numbers { numberSubPage = 0 }        // 進 123 頁從第一頁開始（§66）
