@@ -1381,9 +1381,11 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private var inputSeq = 0                                       // §200 二階段候選 async 排序：同步 refresh/新鍵使 pending async 失效
+    private var pendingCandWork: DispatchWorkItem?                 // §211 二階段候選 debounce（快打合併、減偶發主執行緒阻塞）
 
     private func refresh(_ update: RimeUpdate) {
         inputSeq += 1                                              // §200 同步刷新 → 丟棄任何 pending async 候選（防舊鍵候選蓋掉新狀態）
+        pendingCandWork?.cancel()                                  // §211 取消 pending debounce 候選（同步路徑直接顯示）
         displayPreedit(update)
         displayCandidates(update.candidates, preeditEmpty: update.preedit.isEmpty)
     }
@@ -1400,14 +1402,17 @@ final class KeyboardViewController: UIInputViewController {
             }
         }
         displayPreedit(p1)                                        // 組字字母即時顯示
-        // phase2：候選（grammar，貴）async 延到下一個 runloop → 移出感知關鍵路徑；過時則丟棄。
+        // §211 phase2 debounce：候選（grammar，貴）延 ~40ms 並合併快打 → 組字仍即時、減偶發主執行緒阻塞。
         inputSeq += 1
         let seq = inputSeq
         let preeditEmpty = p1.preedit.isEmpty
-        DispatchQueue.main.async { [weak self] in
+        pendingCandWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
             guard let self, seq == self.inputSeq else { return }  // 更新的鍵/動作已到 → 丟棄舊候選
             self.displayCandidates(self.engine.fetchCandidates(), preeditEmpty: preeditEmpty)
         }
+        pendingCandWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04, execute: work)   // 40ms：快打合併、單鍵幾乎無感
     }
 
     /// §200 phase1 顯示：組字 preedit（marked text 或候選列 label）+ return 鍵。不碰候選列。
