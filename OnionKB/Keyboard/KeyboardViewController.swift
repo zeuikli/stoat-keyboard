@@ -137,6 +137,20 @@ final class KeyboardViewController: UIInputViewController {
     private var keyRowsStack: UIStackView!                          // 鍵列容器（模式切換，§44/§46）
     private var rootStack: UIStackView!                            // topBar + keyRowsStack（展開面板需插入，§89）
     private var rootTopConstraint: NSLayoutConstraint?             // §153 rootStack 頂部約束（候選列隱藏時加大頂部留白，免上緣裁切）
+    private var rootLeadingConstraint: NSLayoutConstraint?         // §206 單手鍵盤：左右縮窄
+    private var rootTrailingConstraint: NSLayoutConstraint?
+    private static let oneHandKey = "kbopt_oneHand"               // §206 0 關 / 1 靠左 / 2 靠右
+    /// §206 單手鍵盤：靠左/右縮窄鍵區、另一側留白（便於單手拇指觸及）。
+    private func applyOneHandMode() {
+        guard let l = rootLeadingConstraint, let t = rootTrailingConstraint else { return }
+        let gap: CGFloat = 92
+        switch localStore.integer(forKey: Self.oneHandKey) {
+        case 1: l.constant = 3;   t.constant = -gap   // 靠左（右側留白）
+        case 2: l.constant = gap; t.constant = -3     // 靠右（左側留白）
+        default: l.constant = 3;  t.constant = -3     // 關＝全寬
+        }
+        UIView.performWithoutAnimation { view.layoutIfNeeded() }
+    }
     private let expandButton = UIButton(type: .system)             // 候選展開/收合 chevron（§89）
     private var expandedPanel: UIScrollView?                       // 展開候選格面板（§89；UICollectionView 即 UIScrollView 子類）
     private var expandedCands: [(abs: Int, text: String)] = []     // 展開面板資料源（絕對索引 + 文字）
@@ -454,6 +468,15 @@ final class KeyboardViewController: UIInputViewController {
         }
         items.append(UIMenu(title: "123 標點", options: .singleSelection,
                             children: [p123("自動（依中英）", 0), p123("半形", 1), p123("全形", 2)]))
+        // §206 單手鍵盤：靠左/右縮窄
+        let oh = localStore.integer(forKey: Self.oneHandKey)
+        func ohAction(_ title: String, _ v: Int) -> UIAction {
+            UIAction(title: title, state: oh == v ? .on : .off) { [weak self] _ in
+                self?.localStore.set(v, forKey: Self.oneHandKey); self?.applyOneHandMode(); self?.refreshOptionsMenu()
+            }
+        }
+        items.append(UIMenu(title: "單手鍵盤", options: .singleSelection,
+                            children: [ohAction("關", 0), ohAction("靠左", 1), ohAction("靠右", 2)]))
         // §139：詞庫即時切換出字異常 → 退回；純注音/Plus 為兩個分別打包的版本，不在此切換。
         let menu = UIMenu(title: "輸入選項", children: items)
         optionsMenu = menu                                       // §168 長按 123/返回鍵叫出
@@ -539,12 +562,14 @@ final class KeyboardViewController: UIInputViewController {
         view.addSubview(rootStack)
         let topC = rootStack.topAnchor.constraint(equalTo: view.topAnchor, constant: 4)   // §153 動態：候選列隱藏(英文/123)時加大
         rootTopConstraint = topC
+        let leadingC = rootStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 3)   // §206 單手可調
+        let trailingC = rootStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -3)
+        rootLeadingConstraint = leadingC; rootTrailingConstraint = trailingC
         NSLayoutConstraint.activate([
-            rootStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 3),
-            rootStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -3),
-            topC,
+            leadingC, trailingC, topC,
             rootStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -4),
         ])
+        applyOneHandMode()   // §206 套用單手縮窄（若有）
         refresh(RimeUpdate(preedit: "", candidates: [], commit: nil))
     }
 
