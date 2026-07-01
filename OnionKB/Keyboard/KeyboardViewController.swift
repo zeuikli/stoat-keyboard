@@ -815,10 +815,10 @@ final class KeyboardViewController: UIInputViewController {
         let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠無填滿線條笑臉（§135）
         let space = wideSpaceKey()
         let ret = returnKey()
-        if layoutMode == 2 {   // §212 平衡：⌫ 移入功能列、⌫/↵ 加大、space 縮窄 [123 中 空格 😀 ⌫ ↵]
+        if layoutMode == 2 {   // §213 平衡：😀 移到 space 左，左[123 中 😀]=3× ⇄ 右[⌫ ↵]各1.5×=3× → 空白鍵置中
             let del = backspaceKey()
-            let k2 = withGlobe([withOptions(num), zh, space, emoji, del, ret])
-            return widebar(k2, wideIndex: k2.firstIndex { $0 === space }!, ref: num, bigKeys: [del, ret], bigMult: 1.35, wideMult: 2.6)
+            let k2 = withGlobe([withOptions(num), zh, emoji, space, del, ret])
+            return widebar(k2, wideIndex: k2.firstIndex { $0 === space }!, ref: num, bigKeys: [del, ret], bigMult: 1.5, wideMult: 2.8)
         }
         let keys = withGlobe([withOptions(num), zh, space, emoji, ret])   // §181 [123 中 空格 😀 ↵]：😀 移右、左2右2 → 空白鍵置中（比照注音 §179）
         return bigFuncKeys   // §209 大功能鍵：↵ 加大 1.7×
@@ -1021,10 +1021,10 @@ final class KeyboardViewController: UIInputViewController {
         let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠無填滿線條笑臉（§135）
         let space = wideSpaceKey()
         let ret = returnKey()
-        if layoutMode == 2 {   // §212 平衡：⌫ 移入功能列、⌫/↵ 加大、space 縮窄 [123 英 空格 😀 ⌫ ↵]
+        if layoutMode == 2 {   // §213 平衡：😀 移到 space 左，左[123 英 😀]=3× ⇄ 右[⌫ ↵]各1.5×=3× → 空白鍵置中
             let del = backspaceKey()
-            let k2 = withGlobe([withOptions(num), cnEn, space, emoji, del, ret])
-            return widebar(k2, wideIndex: k2.firstIndex { $0 === space }!, ref: num, bigKeys: [del, ret], bigMult: 1.35, wideMult: 2.6)
+            let k2 = withGlobe([withOptions(num), cnEn, emoji, space, del, ret])
+            return widebar(k2, wideIndex: k2.firstIndex { $0 === space }!, ref: num, bigKeys: [del, ret], bigMult: 1.5, wideMult: 2.8)
         }
         let keys = withGlobe([withOptions(num), cnEn, space, emoji, ret])   // §179 [123 英 空格 😀 ↵]：😀 移右、左2右2 → 空白鍵置中（兩拇指等距）
         return bigFuncKeys   // §209 大功能鍵：↵ 加大 1.7×
