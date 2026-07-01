@@ -318,7 +318,7 @@ final class KeyboardViewController: UIInputViewController {
         let chrome = candVisible ? bopomoChrome : baseChrome
         // §187 注音鍵高壓縮對齊原廠：原廠注音鍵(112px)比英文鍵(129px)矮(多一列、列高壓縮)。
         // Stoat 原本全模式同鍵高(127px)→注音偏高。注音×0.88≈112px，英文/123 維持(已對齊原廠 129)。
-        let modeRowH = (mode == .bopomo) ? rowH * 0.96 : rowH   // §208 注音鍵加大（原 §187 0.88× 裝置實測太小 → 0.96 貼近英文鍵、按鍵更大好按）
+        let modeRowH = (mode == .bopomo) ? rowH * 0.92 : rowH   // §208 注音鍵加大（原 §187 0.88× 裝置實測太小 → 0.96 貼近英文鍵、按鍵更大好按）
         let h = chrome + curRows * modeRowH + (curRows - 1) * rowGap
         if let c = heightConstraint {
             c.constant = h
@@ -396,6 +396,8 @@ final class KeyboardViewController: UIInputViewController {
 
     /// 套用 schema 選項（半全/標點/簡繁/中英）——讀鍵盤本地存儲（§65）。
     private static let predictionKey = "kbopt_prediction"   // §203 下一詞預測開關（rime `prediction` switch；關＝省每鍵 predictor 成本）
+    private static let layoutKey = "kbopt_layout"           // §209 版面：0 對齊網格(小⌫/↵) / 1 大功能鍵(⌫1.5×+↵加大)
+    private var bigFuncKeys: Bool { localStore.integer(forKey: Self.layoutKey) == 1 }
 
     private func applyOptionDefaults() {
         for opt in SchemaOption.allCases {
@@ -422,7 +424,7 @@ final class KeyboardViewController: UIInputViewController {
         // ── 1. 打字與順暢度
         let typingGroup = UIMenu(title: "打字與順暢度", children: [
             toggle("下一詞預測", Self.predictionKey, localOpt(Self.predictionKey, default: true)) { [weak self] v in self?.engine.setOption("prediction", v) },      // §203
-            toggle("動態注音鍵（依組字淡化）", Self.dynamicKeysKey, localOpt(Self.dynamicKeysKey, default: true)) { [weak self] _ in self?.updateDynamicKeyState() },   // §205
+            dynamicSubmenu(),   // §205/§209 動態注音：關/淡化/放大重排
             toggle("注音內嵌輸入框（關＝顯候選列、較快）", Self.embeddedKey, localOpt(Self.embeddedKey, default: true)) { [weak self] _ in self?.embeddedModeChanged() },
         ])
         // ── 2. 候選字（§193 簡體移入群、遠離錨點誤按位）
@@ -455,6 +457,12 @@ final class KeyboardViewController: UIInputViewController {
                 self?.localStore.set(v, forKey: Self.oneHandKey); self?.applyOneHandMode(); self?.refreshOptionsMenu() }
         }
         appearanceItems.append(UIMenu(title: "單手鍵盤", options: .singleSelection, children: [ohAction("關", 0), ohAction("靠左", 1), ohAction("靠右", 2)]))
+        let lay = localStore.integer(forKey: Self.layoutKey)   // §209 版面配置
+        func layAction(_ t: String, _ v: Int) -> UIAction {
+            UIAction(title: t, state: lay == v ? .on : .off) { [weak self] _ in
+                self?.localStore.set(v, forKey: Self.layoutKey); self?.rebuildKeyRows(); self?.refreshOptionsMenu() }
+        }
+        appearanceItems.append(UIMenu(title: "版面配置", options: .singleSelection, children: [layAction("對齊網格", 0), layAction("大功能鍵（⌫/↵ 加大）", 1)]))
         appearanceItems.append(toggle("常駐數字列", Self.numberRowKey, localOpt(Self.numberRowKey, default: false)) { [weak self] _ in self?.rebuildKeyRows() })
         appearanceItems.append(toggle("注音鍵英文提示", Self.engHintKey, localOpt(Self.engHintKey)) { [weak self] _ in self?.rebuildKeyRows() })
         let appearanceGroup = UIMenu(title: "鍵盤外觀", children: appearanceItems)
@@ -632,9 +640,17 @@ final class KeyboardViewController: UIInputViewController {
             if showNumberRow { keyRowsStack.addArrangedSubview(uniformRow(numberRowKeys())) }
             for (i, row) in BopomoLayout.rows.enumerated() {
                 let notes = row.map { bopomoKey($0) }
-                if i == BopomoLayout.rows.count - 1 {            // §197 第4列統一網格：10 注音 + ⌫ = 11 鍵 fillEqually（＝row1 同機制、同 gridW）
-                    // → 鍵欄與上三列精準對齊，撤 §166 ⌫1.5×（致 §182 注音鍵 (W-66)/11.5 略窄於 grid、逐格左漂＝微錯位根因）。
-                    keyRowsStack.addArrangedSubview(makeKeyRow(notes + [backspaceKey()]))
+                if i == BopomoLayout.rows.count - 1 {            // §209 第4列：兩版面（reflow 時強制網格，隱藏鍵才能 fillEqually 安全重分配）
+                    if bigFuncKeys && dynamicMode != 2 {         // 大功能鍵：⌫ 1.5×（注音鍵略窄、右側略偏，換好按 ⌫）
+                        let del = backspaceKey()
+                        let r = UIStackView(arrangedSubviews: notes + [del])
+                        r.axis = .horizontal; r.spacing = 6; r.distribution = .fill
+                        for n in notes { n.widthAnchor.constraint(equalTo: notes[0].widthAnchor).isActive = true }
+                        del.widthAnchor.constraint(equalTo: notes[0].widthAnchor, multiplier: 1.5).isActive = true
+                        keyRowsStack.addArrangedSubview(r)
+                    } else {                                     // §197 對齊網格：10 注音 + ⌫ = 11 鍵 fillEqually、精準對齊、⌫ 1×
+                        keyRowsStack.addArrangedSubview(makeKeyRow(notes + [backspaceKey()]))
+                    }
                 } else if i == 0 {
                     keyRowsStack.addArrangedSubview(makeKeyRow(notes))   // row1：11 鍵滿版（=網格基準寬）
                 } else if i == 1 {
@@ -797,7 +813,9 @@ final class KeyboardViewController: UIInputViewController {
         let space = wideSpaceKey()
         let ret = returnKey()
         let keys = withGlobe([withOptions(num), zh, space, emoji, ret])   // §181 [123 中 空格 😀 ↵]：😀 移右、左2右2 → 空白鍵置中（比照注音 §179）
-        return widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num)
+        return bigFuncKeys   // §209 大功能鍵：↵ 加大 1.7×
+            ? widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num, bigKey: ret, bigMult: 1.7)
+            : widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num)
     }
 
     static let funcKeyGray = KBColor.funcKey   // §99 動態（淺灰/深灰）
@@ -996,7 +1014,9 @@ final class KeyboardViewController: UIInputViewController {
         let space = wideSpaceKey()
         let ret = returnKey()
         let keys = withGlobe([withOptions(num), cnEn, space, emoji, ret])   // §179 [123 英 空格 😀 ↵]：😀 移右、左2右2 → 空白鍵置中（兩拇指等距）
-        return widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num)
+        return bigFuncKeys   // §209 大功能鍵：↵ 加大 1.7×
+            ? widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num, bigKey: ret, bigMult: 1.7)
+            : widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num)
     }
 
     /// 數字頁功能列（返回字母模式 · 😀 · 寬空格 · ⏎，§44）。
@@ -1169,22 +1189,35 @@ final class KeyboardViewController: UIInputViewController {
         updateDynamicKeyState()   // §205 切模式/大小寫後更新動態鍵狀態
     }
 
-    private static let dynamicKeysKey = "kbopt_dynamicKeys"   // §205 動態注音鍵（依組字禁用不可能接續的鍵）
-    /// §205 依當前組字（聲/介/韻/調狀態機）淡化不可能接續的注音鍵。非注音/英文/關閉時全亮。
+    private static let dynamicKeysKey = "kbopt_dynamicKeys"   // §205/§209 動態注音：0 關 / 1 淡化 / 2 放大重排(B)
+    private var dynamicMode: Int { localStore.object(forKey: Self.dynamicKeysKey) == nil ? 2 : localStore.integer(forKey: Self.dynamicKeysKey) }
+    /// §205/§209 依組字（聲/介/韻/調狀態機）處理不可能接續的注音鍵：淡化(1) 或 隱藏→有效鍵撐大(2)。
     private func updateDynamicKeyState() {
-        let active = mode == .bopomo && !englishMode && localOpt(Self.dynamicKeysKey, default: true)
-        guard active else {
-            for (_, b, _) in bopomoKeys { b.alpha = 1 }
+        let dyn = dynamicMode
+        guard mode == .bopomo, !englishMode, dyn != 0 else {
+            for (_, b, _) in bopomoKeys { b.alpha = 1; b.isHidden = false }
             return
         }
         let valid = BopomoLayout.validNextClasses(preedit: isPreeditEmpty ? "" : preeditText)
         for (key, b, _) in bopomoKeys {
-            if let cls = BopomoLayout.phoneClass(key.symbol) {
-                b.alpha = valid.contains(cls) ? 1.0 : 0.28   // 淡化＝視覺提示，仍可點（v1 不硬擋、避免誤擋合法輸入）
-            } else {
-                b.alpha = 1.0
+            guard let cls = BopomoLayout.phoneClass(key.symbol) else { b.alpha = 1; b.isHidden = false; continue }
+            let ok = valid.contains(cls)
+            if dyn == 2 { b.isHidden = !ok; b.alpha = 1 }        // 放大重排：隱藏無效鍵→同列有效鍵 fillEqually 撐大
+            else { b.alpha = ok ? 1.0 : 0.28; b.isHidden = false }  // 淡化：仍可點、不誤擋
+        }
+    }
+
+    /// §209 動態注音三態子選單（關/淡化/放大重排）。切換須 rebuildKeyRows（reflow 改 row4 結構）。
+    private func dynamicSubmenu() -> UIMenu {
+        let cur = dynamicMode
+        func act(_ t: String, _ v: Int) -> UIAction {
+            UIAction(title: t, state: cur == v ? .on : .off) { [weak self] _ in
+                self?.localStore.set(v, forKey: Self.dynamicKeysKey)
+                self?.rebuildKeyRows(); self?.updateDynamicKeyState(); self?.refreshOptionsMenu()
             }
         }
+        return UIMenu(title: "動態注音鍵", options: .singleSelection,
+                      children: [act("關", 0), act("淡化", 1), act("放大重排", 2)])
     }
 
     // MARK: - Input
