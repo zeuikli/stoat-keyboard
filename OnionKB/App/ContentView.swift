@@ -30,11 +30,11 @@ struct ContentView: View {
                     .onChange(of: fontScale) { newValue in KBSettings.keyFontScale = newValue }
                     Text("目前：\(Int(fontScale * 100))%").font(.footnote).foregroundStyle(.secondary)
                 }
-                Section("純注音與Plus") {
+                Section("加入鍵盤") {
                     Label("加入鍵盤後即可打注音", systemImage: "keyboard")
                     Text("設定 → 一般 → 鍵盤 → 加入新鍵盤 → Stoat")
                         .font(.footnote).foregroundStyle(.secondary)
-                    Text("提供兩種詞庫版本：純注音（核心字詞）與 Plus（再加 81 萬擴充詞組），分別打包，安裝對應版本即可。")
+                    Text("內建洋蔥 Plus 精選詞庫（純注音核心 + 約 35.6 萬精選詞組），已預先編譯進鍵盤、開箱即用；並含上下文語法重排（越打越準）。")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section("詞庫 / UserData") {

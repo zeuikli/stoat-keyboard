@@ -318,7 +318,7 @@ final class KeyboardViewController: UIInputViewController {
         let chrome = candVisible ? bopomoChrome : baseChrome
         // §187 注音鍵高壓縮對齊原廠：原廠注音鍵(112px)比英文鍵(129px)矮(多一列、列高壓縮)。
         // Stoat 原本全模式同鍵高(127px)→注音偏高。注音×0.88≈112px，英文/123 維持(已對齊原廠 129)。
-        let modeRowH = (mode == .bopomo) ? rowH * 0.88 : rowH
+        let modeRowH = (mode == .bopomo) ? rowH * 0.96 : rowH   // §208 注音鍵加大（原 §187 0.88× 裝置實測太小 → 0.96 貼近英文鍵、按鍵更大好按）
         let h = chrome + curRows * modeRowH + (curRows - 1) * rowGap
         if let c = heightConstraint {
             c.constant = h
@@ -412,54 +412,53 @@ final class KeyboardViewController: UIInputViewController {
                 self?.setLocalOpt(key, !on); apply(!on); self?.refreshOptionsMenu()
             }
         }
-        // 移除「全形標點/字元」(fullShape) 與「英式標點」(asciiPunct)（§138 #1）；123 半全形改由「123 標點」子選單控制
-        var items: [UIMenuElement] = SchemaOption.allCases.filter { ![.asciiMode, .fullShape, .asciiPunct, .simplification].contains($0) }.map { opt in
+        func schemaToggle(_ opt: SchemaOption) -> UIAction {   // 表情/顏文字/簡體候選
             toggle(opt.title, optKey(opt), localOpt(optKey(opt), default: opt.defaultOn)) { [weak self] v in
                 self?.engine.setOption(opt.rawValue, v)
-                if opt == .fullShape { self?.rebuildKeyRows() }   // 123 頁半全形即時更新（§71）
             }
         }
+
+        // §208 二層選單：分「打字與順暢度／候選字／鍵盤外觀／標點與第一列」四組，收斂扁平長清單。
+        // ── 1. 打字與順暢度
+        let typingGroup = UIMenu(title: "打字與順暢度", children: [
+            toggle("下一詞預測", Self.predictionKey, localOpt(Self.predictionKey, default: true)) { [weak self] v in self?.engine.setOption("prediction", v) },      // §203
+            toggle("動態注音鍵（依組字淡化）", Self.dynamicKeysKey, localOpt(Self.dynamicKeysKey, default: true)) { [weak self] _ in self?.updateDynamicKeyState() },   // §205
+            toggle("注音內嵌輸入框（關＝顯候選列、較快）", Self.embeddedKey, localOpt(Self.embeddedKey, default: true)) { [weak self] _ in self?.embeddedModeChanged() },
+        ])
+        // ── 2. 候選字（§193 簡體移入群、遠離錨點誤按位）
+        let candidateGroup = UIMenu(title: "候選字", children: [
+            schemaToggle(.emoji), schemaToggle(.kaomoji), schemaToggle(.simplification),
+        ])
+        // ── 3. 鍵盤外觀（玻璃 + 單手 + 數字列 + 英文提示）
+        var appearanceItems: [UIMenuElement] = []
         if #available(iOS 26.0, *) {
             let glassOn = localOpt(Self.glassKey, default: false)
-            items.append(toggle("iOS 26 玻璃按鍵", Self.glassKey, glassOn) { [weak self] _ in self?.rebuildKeyRows(); self?.refreshOptionsMenu() })
-            if glassOn {   // §141：玻璃風格（霜面/透明）+ 色調
+            appearanceItems.append(toggle("iOS 26 玻璃按鍵", Self.glassKey, glassOn) { [weak self] _ in self?.rebuildKeyRows(); self?.refreshOptionsMenu() })
+            if glassOn {
                 let clear = localOpt(Self.glassStyleKey)
                 func gstyle(_ t: String, _ v: Bool) -> UIAction {
                     UIAction(title: t, state: clear == v ? .on : .off) { [weak self] _ in
                         self?.setLocalOpt(Self.glassStyleKey, v); self?.rebuildKeyRows(); self?.refreshOptionsMenu() }
                 }
-                items.append(UIMenu(title: "玻璃風格", options: .singleSelection,
-                                    children: [gstyle("霜面", false), gstyle("透明", true)]))
+                appearanceItems.append(UIMenu(title: "玻璃風格", options: .singleSelection, children: [gstyle("霜面", false), gstyle("透明", true)]))
                 let tint = localStore.integer(forKey: Self.glassTintKey)
                 func gtint(_ t: String, _ v: Int) -> UIAction {
                     UIAction(title: t, state: tint == v ? .on : .off) { [weak self] _ in
                         self?.localStore.set(v, forKey: Self.glassTintKey); self?.rebuildKeyRows(); self?.refreshOptionsMenu() }
                 }
-                items.append(UIMenu(title: "色調", options: .singleSelection,
-                                    children: [gtint("無色", 0), gtint("藍", 1), gtint("灰", 2), gtint("暖", 3)]))
+                appearanceItems.append(UIMenu(title: "色調", options: .singleSelection, children: [gtint("無色", 0), gtint("藍", 1), gtint("灰", 2), gtint("暖", 3)]))
             }
         }
-        items.append(toggle("注音內嵌輸入框（關＝顯候選列、較快）", Self.embeddedKey, localOpt(Self.embeddedKey, default: true)) { [weak self] _ in self?.embeddedModeChanged() })
-        items.append(toggle("常駐數字列", Self.numberRowKey, localOpt(Self.numberRowKey, default: false)) { [weak self] _ in self?.rebuildKeyRows() })
-        items.append(toggle("注音鍵英文提示", Self.engHintKey, localOpt(Self.engHintKey)) { [weak self] _ in self?.rebuildKeyRows() })
-        // §193 簡體輸出移出選單開頭：原為 SchemaOption 第一項＝⚙ 選單最靠近手指處→誤按即全文轉简体（後果重）。
-        // 改插中段，遠離錨點邊緣的危險位。
-        items.append(toggle(SchemaOption.simplification.title, optKey(.simplification),
-                            localOpt(optKey(.simplification), default: SchemaOption.simplification.defaultOn)) { [weak self] v in
-            self?.engine.setOption(SchemaOption.simplification.rawValue, v)
-        })
-        // 第一列固定（§130）：標點 / 顏文字各自決定是否顯示
-        // §203 下一詞預測（predictor）：關掉省每鍵成本、提升順暢度（不影響組字/選字，只少「打完詞後預測下一詞」）
-        items.append(toggle("下一詞預測", Self.predictionKey, localOpt(Self.predictionKey, default: true)) { [weak self] v in
-            self?.engine.setOption("prediction", v)
-        })
-        // §205 動態注音鍵：依組字聲/介/韻/調狀態淡化不可能接續的鍵（對標原廠）
-        items.append(toggle("動態注音鍵（依組字淡化）", Self.dynamicKeysKey, localOpt(Self.dynamicKeysKey, default: true)) { [weak self] _ in self?.updateDynamicKeyState() })
-        // §207 標點推薦：組字結束在候選列尾端附加標點，點選即插入
-        items.append(toggle("標點推薦", Self.punctRecommendKey, localOpt(Self.punctRecommendKey, default: true)) { _ in })
-        items.append(toggle("第一列標點", Self.quickPunctKey, localOpt(Self.quickPunctKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
-        items.append(toggle("第一列顏文字", Self.quickKaomojiKey, localOpt(Self.quickKaomojiKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
-        // 123 標點：自動依中英 / 半形 / 全形（§82）
+        let oh = localStore.integer(forKey: Self.oneHandKey)
+        func ohAction(_ title: String, _ v: Int) -> UIAction {
+            UIAction(title: title, state: oh == v ? .on : .off) { [weak self] _ in
+                self?.localStore.set(v, forKey: Self.oneHandKey); self?.applyOneHandMode(); self?.refreshOptionsMenu() }
+        }
+        appearanceItems.append(UIMenu(title: "單手鍵盤", options: .singleSelection, children: [ohAction("關", 0), ohAction("靠左", 1), ohAction("靠右", 2)]))
+        appearanceItems.append(toggle("常駐數字列", Self.numberRowKey, localOpt(Self.numberRowKey, default: false)) { [weak self] _ in self?.rebuildKeyRows() })
+        appearanceItems.append(toggle("注音鍵英文提示", Self.engHintKey, localOpt(Self.engHintKey)) { [weak self] _ in self?.rebuildKeyRows() })
+        let appearanceGroup = UIMenu(title: "鍵盤外觀", children: appearanceItems)
+        // ── 4. 標點與第一列
         let cur = localStore.integer(forKey: Self.n123ModeKey)
         func p123(_ title: String, _ v: Int) -> UIAction {
             UIAction(title: title, state: cur == v ? .on : .off) { [weak self] _ in
@@ -468,19 +467,13 @@ final class KeyboardViewController: UIInputViewController {
                 self?.refreshOptionsMenu()
             }
         }
-        items.append(UIMenu(title: "123 標點", options: .singleSelection,
-                            children: [p123("自動（依中英）", 0), p123("半形", 1), p123("全形", 2)]))
-        // §206 單手鍵盤：靠左/右縮窄
-        let oh = localStore.integer(forKey: Self.oneHandKey)
-        func ohAction(_ title: String, _ v: Int) -> UIAction {
-            UIAction(title: title, state: oh == v ? .on : .off) { [weak self] _ in
-                self?.localStore.set(v, forKey: Self.oneHandKey); self?.applyOneHandMode(); self?.refreshOptionsMenu()
-            }
-        }
-        items.append(UIMenu(title: "單手鍵盤", options: .singleSelection,
-                            children: [ohAction("關", 0), ohAction("靠左", 1), ohAction("靠右", 2)]))
-        // §139：詞庫即時切換出字異常 → 退回；純注音/Plus 為兩個分別打包的版本，不在此切換。
-        let menu = UIMenu(title: "輸入選項", children: items)
+        let punctGroup = UIMenu(title: "標點與第一列", children: [
+            toggle("標點推薦", Self.punctRecommendKey, localOpt(Self.punctRecommendKey, default: true)) { _ in },   // §207
+            toggle("第一列標點", Self.quickPunctKey, localOpt(Self.quickPunctKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() },
+            toggle("第一列顏文字", Self.quickKaomojiKey, localOpt(Self.quickKaomojiKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() },
+            UIMenu(title: "123 標點", options: .singleSelection, children: [p123("自動（依中英）", 0), p123("半形", 1), p123("全形", 2)]),
+        ])
+        let menu = UIMenu(title: "輸入選項", children: [typingGroup, candidateGroup, appearanceGroup, punctGroup])
         optionsMenu = menu                                       // §168 長按 123/返回鍵叫出
         funcOptionsButtons.forEach { $0.menu = menu }            // 同步已掛選單的鍵（設定變更時）
     }
