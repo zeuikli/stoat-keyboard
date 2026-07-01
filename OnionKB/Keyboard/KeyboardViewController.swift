@@ -642,12 +642,13 @@ final class KeyboardViewController: UIInputViewController {
             for (i, row) in BopomoLayout.rows.enumerated() {
                 let notes = row.map { bopomoKey($0) }
                 if i == BopomoLayout.rows.count - 1 {            // §212 第4列：三版面
-                    if layoutMode == 1 {                         // 大功能鍵：⌫ 1.5×（.fill、注音鍵略窄右偏、換好按 ⌫）
+                    if layoutMode == 1 {                         // 大功能鍵：⌫ 1.4× + 緩衝（.fill、注音鍵略窄右偏、換好按 ⌫）
                         let del = backspaceKey()
-                        let r = UIStackView(arrangedSubviews: notes + [del])
+                        let buf = keyBuffer(ref: notes[0])       // §214 ⌫ 緩衝空白（防誤按 ㄥ）
+                        let r = UIStackView(arrangedSubviews: notes + [buf, del])
                         r.axis = .horizontal; r.spacing = 6; r.distribution = .fill
                         for n in notes { n.widthAnchor.constraint(equalTo: notes[0].widthAnchor).isActive = true }
-                        del.widthAnchor.constraint(equalTo: notes[0].widthAnchor, multiplier: 1.5).isActive = true
+                        del.widthAnchor.constraint(equalTo: notes[0].widthAnchor, multiplier: 1.4).isActive = true
                         keyRowsStack.addArrangedSubview(r)
                     } else if layoutMode == 2 {                  // §212 平衡：10 注音置中對齊(同 row2/3 網格)、⌫ 移到功能列加大
                         keyRowsStack.addArrangedSubview(uniformRow(notes))
@@ -743,11 +744,12 @@ final class KeyboardViewController: UIInputViewController {
         shiftButton = shift
         let letters = rows[2].map { englishKey($0) }
         let del = backspaceKey()
-        let r3 = UIStackView(arrangedSubviews: [shift] + letters + [del])
+        let bufL = keyBuffer(ref: letters[0]); let bufR = keyBuffer(ref: letters[0])   // §214 ⇧/⌫ 緩衝空白（防誤按旁鍵，對標原廠拼音鍵盤）
+        let r3 = UIStackView(arrangedSubviews: [shift, bufL] + letters + [bufR, del])
         r3.axis = .horizontal; r3.spacing = 6; r3.distribution = .fill
         for k in letters { k.widthAnchor.constraint(equalTo: letters[0].widthAnchor).isActive = true }
-        shift.widthAnchor.constraint(equalTo: letters[0].widthAnchor, multiplier: 1.5).isActive = true
-        del.widthAnchor.constraint(equalTo: letters[0].widthAnchor, multiplier: 1.5).isActive = true
+        shift.widthAnchor.constraint(equalTo: letters[0].widthAnchor, multiplier: 1.3).isActive = true
+        del.widthAnchor.constraint(equalTo: letters[0].widthAnchor, multiplier: 1.3).isActive = true
         keyRowsStack.addArrangedSubview(r3)
         keyRowsStack.addArrangedSubview(englishFunctionRow())
     }
@@ -1054,6 +1056,13 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     /// 功能列：小鍵等寬、指定一鍵（空格）加寬，比照 iOS。bigKey 可選放大某鍵（§185 123 頁 ↵）。
+    /// §214 按鍵緩衝空白（對標原廠拼音：⌫/⇧ 與字母/注音間留間隙防誤按）。
+    private func keyBuffer(ref: UIView, mult: CGFloat = 0.3) -> UIView {
+        let v = UIView()
+        v.widthAnchor.constraint(equalTo: ref.widthAnchor, multiplier: mult).isActive = true
+        return v
+    }
+
     private func widebar(_ keys: [UIView], wideIndex: Int, ref: UIView, bigKeys: [UIView] = [], bigMult: CGFloat = 2.0, wideMult: CGFloat = 4.5) -> UIStackView {
         let row = UIStackView(arrangedSubviews: keys)
         row.axis = .horizontal
