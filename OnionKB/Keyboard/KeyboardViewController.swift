@@ -381,10 +381,13 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     /// 套用 schema 選項（半全/標點/簡繁/中英）——讀鍵盤本地存儲（§65）。
+    private static let predictionKey = "kbopt_prediction"   // §203 下一詞預測開關（rime `prediction` switch；關＝省每鍵 predictor 成本）
+
     private func applyOptionDefaults() {
         for opt in SchemaOption.allCases {
             engine.setOption(opt.rawValue, localOpt(optKey(opt), default: opt.defaultOn))
         }
+        engine.setOption("prediction", localOpt(Self.predictionKey, default: true))   // §203 預設開；⚙ 可關提升順暢度
         updateModeStyling()
     }
 
@@ -432,6 +435,10 @@ final class KeyboardViewController: UIInputViewController {
             self?.engine.setOption(SchemaOption.simplification.rawValue, v)
         })
         // 第一列固定（§130）：標點 / 顏文字各自決定是否顯示
+        // §203 下一詞預測（predictor）：關掉省每鍵成本、提升順暢度（不影響組字/選字，只少「打完詞後預測下一詞」）
+        items.append(toggle("下一詞預測", Self.predictionKey, localOpt(Self.predictionKey, default: true)) { [weak self] v in
+            self?.engine.setOption("prediction", v)
+        })
         items.append(toggle("第一列標點", Self.quickPunctKey, localOpt(Self.quickPunctKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         items.append(toggle("第一列顏文字", Self.quickKaomojiKey, localOpt(Self.quickKaomojiKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         // 123 標點：自動依中英 / 半形 / 全形（§82）
