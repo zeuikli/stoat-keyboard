@@ -424,7 +424,7 @@ final class KeyboardViewController: UIInputViewController {
         // ── 1. 打字與順暢度
         let typingGroup = UIMenu(title: "打字與順暢度", children: [
             toggle("下一詞預測", Self.predictionKey, localOpt(Self.predictionKey, default: true)) { [weak self] v in self?.engine.setOption("prediction", v) },      // §203
-            dynamicSubmenu(),   // §205/§209 動態注音：關/淡化/放大重排
+            toggle("動態注音鍵（依組字淡化）", Self.dynamicKeysKey, localOpt(Self.dynamicKeysKey, default: true)) { [weak self] _ in self?.updateDynamicKeyState() },   // §205
             toggle("注音內嵌輸入框（關＝顯候選列、較快）", Self.embeddedKey, localOpt(Self.embeddedKey, default: true)) { [weak self] _ in self?.embeddedModeChanged() },
         ])
         // ── 2. 候選字（§193 簡體移入群、遠離錨點誤按位）
@@ -640,8 +640,8 @@ final class KeyboardViewController: UIInputViewController {
             if showNumberRow { keyRowsStack.addArrangedSubview(uniformRow(numberRowKeys())) }
             for (i, row) in BopomoLayout.rows.enumerated() {
                 let notes = row.map { bopomoKey($0) }
-                if i == BopomoLayout.rows.count - 1 {            // §209 第4列：兩版面（reflow 時強制網格，隱藏鍵才能 fillEqually 安全重分配）
-                    if bigFuncKeys && dynamicMode != 2 {         // 大功能鍵：⌫ 1.5×（注音鍵略窄、右側略偏，換好按 ⌫）
+                if i == BopomoLayout.rows.count - 1 {            // §209 第4列：兩版面
+                    if bigFuncKeys {                             // 大功能鍵：⌫ 1.5×（注音鍵略窄、右側略偏，換好按 ⌫）
                         let del = backspaceKey()
                         let r = UIStackView(arrangedSubviews: notes + [del])
                         r.axis = .horizontal; r.spacing = 6; r.distribution = .fill
@@ -1189,35 +1189,20 @@ final class KeyboardViewController: UIInputViewController {
         updateDynamicKeyState()   // §205 切模式/大小寫後更新動態鍵狀態
     }
 
-    private static let dynamicKeysKey = "kbopt_dynamicKeys"   // §205/§209 動態注音：0 關 / 1 淡化 / 2 放大重排(B)
-    private var dynamicMode: Int { localStore.object(forKey: Self.dynamicKeysKey) == nil ? 2 : localStore.integer(forKey: Self.dynamicKeysKey) }
-    /// §205/§209 依組字（聲/介/韻/調狀態機）處理不可能接續的注音鍵：淡化(1) 或 隱藏→有效鍵撐大(2)。
+    private static let dynamicKeysKey = "kbopt_dynamicKeys"   // §205 動態注音鍵（依組字淡化不可能接續的鍵）
+    /// §205 依組字（聲/介/韻/調狀態機）淡化不可能接續的注音鍵。非注音/英文/關閉時全亮。（§209 放大重排已依使用者要求移除）
     private func updateDynamicKeyState() {
-        let dyn = dynamicMode
-        guard mode == .bopomo, !englishMode, dyn != 0 else {
+        let active = mode == .bopomo && !englishMode && localOpt(Self.dynamicKeysKey, default: true)
+        guard active else {
             for (_, b, _) in bopomoKeys { b.alpha = 1; b.isHidden = false }
             return
         }
         let valid = BopomoLayout.validNextClasses(preedit: isPreeditEmpty ? "" : preeditText)
         for (key, b, _) in bopomoKeys {
-            guard let cls = BopomoLayout.phoneClass(key.symbol) else { b.alpha = 1; b.isHidden = false; continue }
-            let ok = valid.contains(cls)
-            if dyn == 2 { b.isHidden = !ok; b.alpha = 1 }        // 放大重排：隱藏無效鍵→同列有效鍵 fillEqually 撐大
-            else { b.alpha = ok ? 1.0 : 0.28; b.isHidden = false }  // 淡化：仍可點、不誤擋
+            if let cls = BopomoLayout.phoneClass(key.symbol) {
+                b.alpha = valid.contains(cls) ? 1.0 : 0.28   // 淡化＝視覺提示，仍可點、不誤擋
+            } else { b.alpha = 1.0 }
         }
-    }
-
-    /// §209 動態注音三態子選單（關/淡化/放大重排）。切換須 rebuildKeyRows（reflow 改 row4 結構）。
-    private func dynamicSubmenu() -> UIMenu {
-        let cur = dynamicMode
-        func act(_ t: String, _ v: Int) -> UIAction {
-            UIAction(title: t, state: cur == v ? .on : .off) { [weak self] _ in
-                self?.localStore.set(v, forKey: Self.dynamicKeysKey)
-                self?.rebuildKeyRows(); self?.updateDynamicKeyState(); self?.refreshOptionsMenu()
-            }
-        }
-        return UIMenu(title: "動態注音鍵", options: .singleSelection,
-                      children: [act("關", 0), act("淡化", 1), act("放大重排", 2)])
     }
 
     // MARK: - Input

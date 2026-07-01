@@ -74,7 +74,6 @@ engine:
     - "simplifier@zh_cn"
     - "simplifier@emoji"
     - "simplifier@variant_normalize"
-    - "reverse_lookup_filter@bpm_reverse_lookup"
     - uniquifier
   processors:
     - predictor
