@@ -455,6 +455,8 @@ final class KeyboardViewController: UIInputViewController {
         })
         // §205 動態注音鍵：依組字聲/介/韻/調狀態淡化不可能接續的鍵（對標原廠）
         items.append(toggle("動態注音鍵（依組字淡化）", Self.dynamicKeysKey, localOpt(Self.dynamicKeysKey, default: true)) { [weak self] _ in self?.updateDynamicKeyState() })
+        // §207 標點推薦：組字結束在候選列尾端附加標點，點選即插入
+        items.append(toggle("標點推薦", Self.punctRecommendKey, localOpt(Self.punctRecommendKey, default: true)) { _ in })
         items.append(toggle("第一列標點", Self.quickPunctKey, localOpt(Self.quickPunctKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         items.append(toggle("第一列顏文字", Self.quickKaomojiKey, localOpt(Self.quickKaomojiKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         // 123 標點：自動依中英 / 半形 / 全形（§82）
@@ -1459,6 +1461,27 @@ final class KeyboardViewController: UIInputViewController {
         // §194 移除本輪未用到的多餘候選鈕（從尾端，維持 slot 順序）
         while candidateStack.arrangedSubviews.count > slot {
             candidateStack.arrangedSubviews.last?.removeFromSuperview()
+        }
+        if preeditEmpty, shouldRecommendPunct() { showPunctRecommendations() }   // §207 組字結束→候選列尾端附加標點推薦（可點插入、不取代預測）
+    }
+
+    private static let punctRecommendKey = "kbopt_punctRec"   // §207 標點推薦（推薦讓你點、非自動上字）
+    private static let recommendPuncts = ["，", "。", "、", "？", "！", "；", "：", "「", "」"]
+    /// §207 是否推薦標點：需有前文、且前字非標點（避免連續標點）。
+    private func shouldRecommendPunct() -> Bool {
+        guard localOpt(Self.punctRecommendKey, default: true) else { return false }
+        guard let last = (textDocumentProxy.documentContextBeforeInput ?? "").last else { return false }
+        return !"，。、？！；：「」（）()，.?!;: \n".contains(last)
+    }
+    /// §207 在候選列尾端加標點推薦鈕（tap 直接插入，不 commit 候選）。
+    private func showPunctRecommendations() {
+        for p in Self.recommendPuncts {
+            let b = UIButton(type: .system)
+            b.setTitle(p, for: .normal)
+            b.titleLabel?.font = .systemFont(ofSize: 20 * fontScale)
+            b.setTitleColor(.secondaryLabel, for: .normal)   // 較淡＝推薦、與候選區分
+            b.addAction(UIAction { [weak self] _ in self?.playClick(); self?.textDocumentProxy.insertText(p) }, for: .touchUpInside)
+            candidateStack.addArrangedSubview(b)
         }
     }
 
