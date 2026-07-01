@@ -396,9 +396,11 @@ final class KeyboardViewController: UIInputViewController {
 
     /// 套用 schema 選項（半全/標點/簡繁/中英）——讀鍵盤本地存儲（§65）。
     private static let predictionKey = "kbopt_prediction"   // §203 下一詞預測開關（rime `prediction` switch；關＝省每鍵 predictor 成本）
-    private static let layoutKey = "kbopt_layout"           // §209/§212 版面：0 對齊網格 / 1 大功能鍵 / 2 平衡(row4對齊+⌫移功能列)
+    private static let layoutKey = "kbopt_layout"           // §209 版面：0 對齊網格 / 1 大功能鍵（§215 移除平衡）
     private var layoutMode: Int { localStore.integer(forKey: Self.layoutKey) }
     private var bigFuncKeys: Bool { layoutMode == 1 }
+    private static let wideSpaceOptKey = "kbopt_wideSpace"  // §215 加大空格鍵（獨立選項，各版面通用）
+    private var spaceWideMult: CGFloat { localOpt(Self.wideSpaceOptKey, default: false) ? 5.6 : 4.5 }
 
     private func applyOptionDefaults() {
         for opt in SchemaOption.allCases {
@@ -463,7 +465,9 @@ final class KeyboardViewController: UIInputViewController {
             UIAction(title: t, state: lay == v ? .on : .off) { [weak self] _ in
                 self?.localStore.set(v, forKey: Self.layoutKey); self?.rebuildKeyRows(); self?.refreshOptionsMenu() }
         }
-        appearanceItems.append(UIMenu(title: "版面配置", options: .singleSelection, children: [layAction("對齊網格", 0), layAction("大功能鍵（⌫1.5×）", 1), layAction("平衡（注音對齊·⌫下移）", 2)]))
+        appearanceItems.append(UIMenu(title: "版面配置", options: .singleSelection, children: [layAction("對齊網格", 0), layAction("大功能鍵（⌫加大）", 1)]))
+        // §215 加大空格鍵（獨立選項，各版面通用）
+        appearanceItems.append(toggle("加大空格鍵", Self.wideSpaceOptKey, localOpt(Self.wideSpaceOptKey, default: false)) { [weak self] _ in self?.rebuildKeyRows() })
         appearanceItems.append(toggle("常駐數字列", Self.numberRowKey, localOpt(Self.numberRowKey, default: false)) { [weak self] _ in self?.rebuildKeyRows() })
         appearanceItems.append(toggle("注音鍵英文提示", Self.engHintKey, localOpt(Self.engHintKey)) { [weak self] _ in self?.rebuildKeyRows() })
         let appearanceGroup = UIMenu(title: "鍵盤外觀", children: appearanceItems)
@@ -650,8 +654,6 @@ final class KeyboardViewController: UIInputViewController {
                         for n in notes { n.widthAnchor.constraint(equalTo: notes[0].widthAnchor).isActive = true }
                         del.widthAnchor.constraint(equalTo: notes[0].widthAnchor, multiplier: 1.4).isActive = true
                         keyRowsStack.addArrangedSubview(r)
-                    } else if layoutMode == 2 {                  // §212 平衡：10 注音置中對齊(同 row2/3 網格)、⌫ 移到功能列加大
-                        keyRowsStack.addArrangedSubview(uniformRow(notes))
                     } else {                                     // §197 對齊網格：10 注音 + ⌫ = 11 鍵 fillEqually、精準對齊、⌫ 1×
                         keyRowsStack.addArrangedSubview(makeKeyRow(notes + [backspaceKey()]))
                     }
@@ -817,15 +819,10 @@ final class KeyboardViewController: UIInputViewController {
         let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠無填滿線條笑臉（§135）
         let space = wideSpaceKey()
         let ret = returnKey()
-        if layoutMode == 2 {   // §213 平衡：😀 移到 space 左，左[123 中 😀]=3× ⇄ 右[⌫ ↵]各1.5×=3× → 空白鍵置中
-            let del = backspaceKey()
-            let k2 = withGlobe([withOptions(num), zh, emoji, space, del, ret])
-            return widebar(k2, wideIndex: k2.firstIndex { $0 === space }!, ref: num, bigKeys: [del, ret], bigMult: 1.5, wideMult: 2.8)
-        }
         let keys = withGlobe([withOptions(num), zh, space, emoji, ret])   // §181 [123 中 空格 😀 ↵]：😀 移右、左2右2 → 空白鍵置中（比照注音 §179）
         return bigFuncKeys   // §209 大功能鍵：↵ 加大 1.7×
-            ? widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num, bigKeys: [ret], bigMult: 1.7)
-            : widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num)
+            ? widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num, bigKeys: [ret], bigMult: 1.7, wideMult: spaceWideMult)
+            : widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num, wideMult: spaceWideMult)
     }
 
     static let funcKeyGray = KBColor.funcKey   // §99 動態（淺灰/深灰）
@@ -1023,15 +1020,10 @@ final class KeyboardViewController: UIInputViewController {
         let emoji = grayKey(iconButton("face.smiling") { [weak self] in self?.showKaomojiPanel() })   // 原廠無填滿線條笑臉（§135）
         let space = wideSpaceKey()
         let ret = returnKey()
-        if layoutMode == 2 {   // §213 平衡：😀 移到 space 左，左[123 英 😀]=3× ⇄ 右[⌫ ↵]各1.5×=3× → 空白鍵置中
-            let del = backspaceKey()
-            let k2 = withGlobe([withOptions(num), cnEn, emoji, space, del, ret])
-            return widebar(k2, wideIndex: k2.firstIndex { $0 === space }!, ref: num, bigKeys: [del, ret], bigMult: 1.5, wideMult: 2.8)
-        }
         let keys = withGlobe([withOptions(num), cnEn, space, emoji, ret])   // §179 [123 英 空格 😀 ↵]：😀 移右、左2右2 → 空白鍵置中（兩拇指等距）
         return bigFuncKeys   // §209 大功能鍵：↵ 加大 1.7×
-            ? widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num, bigKeys: [ret], bigMult: 1.7)
-            : widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num)
+            ? widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num, bigKeys: [ret], bigMult: 1.7, wideMult: spaceWideMult)
+            : widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: num, wideMult: spaceWideMult)
     }
 
     /// 數字頁功能列（返回字母模式 · 😀 · 寬空格 · ⏎，§44）。
@@ -1042,7 +1034,7 @@ final class KeyboardViewController: UIInputViewController {
         let space = wideSpaceKey()
         let ret = returnKey()
         let keys = withGlobe([withOptions(back), emoji, space, ret])   // §185 [注音/ABC 😀 空格 ↵2×]：😀 移左、↵ 放大 2× → 左2(返回+😀)=右2(↵2×)、空白鍵置中且 Enter 大
-        return widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: back, bigKeys: [ret], bigMult: 2.0)
+        return widebar(keys, wideIndex: keys.firstIndex { $0 === space }!, ref: back, bigKeys: [ret], bigMult: 2.0, wideMult: spaceWideMult)
     }
 
     private func wideSpaceKey() -> UIButton {
