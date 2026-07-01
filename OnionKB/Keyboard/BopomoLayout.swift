@@ -29,6 +29,35 @@ enum BopomoLayout {
         [k("ㄈ","z"), k("ㄌ","x"), k("ㄏ","c"), k("ㄒ","v"), k("ㄖ","b"), k("ㄙ","n"), k("ㄩ","m"), k("ㄝ",","), k("ㄡ","."), k("ㄥ","/")],
     ]
 
+    // §205 動態注音（聲/介/韻/調 phonotactic 狀態機）：依當前組字禁用不可能接續的鍵。
+    enum PhoneClass { case initial, medial, final, tone }   // 聲母 / 介音 / 韻母 / 聲調
+    static let initials: Set<String> = ["ㄅ","ㄆ","ㄇ","ㄈ","ㄉ","ㄊ","ㄋ","ㄌ","ㄍ","ㄎ","ㄏ","ㄐ","ㄑ","ㄒ","ㄓ","ㄔ","ㄕ","ㄖ","ㄗ","ㄘ","ㄙ"]
+    static let medials: Set<String> = ["ㄧ","ㄨ","ㄩ"]
+    static let finals: Set<String> = ["ㄚ","ㄛ","ㄜ","ㄝ","ㄞ","ㄟ","ㄠ","ㄡ","ㄢ","ㄣ","ㄤ","ㄥ","ㄦ"]
+    static let tones: Set<String> = ["ˊ","ˇ","ˋ","˙"]
+    static func phoneClass(_ symbol: String) -> PhoneClass? {
+        if initials.contains(symbol) { return .initial }
+        if medials.contains(symbol) { return .medial }
+        if finals.contains(symbol) { return .final }
+        if tones.contains(symbol) { return .tone }
+        return nil
+    }
+    /// 合法下一類（取 preedit 尾音節＝最後聲調之後的段落，依已填槽推斷；偏寬鬆不誤擋）。
+    static func validNextClasses(preedit: String) -> Set<PhoneClass> {
+        var trailing: [String] = []
+        for s in preedit.reversed().map(String.init) {   // 從尾往前，遇聲調即斷（音節界）
+            if tones.contains(s) { break }
+            trailing.append(s)
+        }
+        let hasInitial = trailing.contains { initials.contains($0) }
+        let hasMedial = trailing.contains { medials.contains($0) }
+        let hasFinal = trailing.contains { finals.contains($0) }
+        if hasFinal { return [.tone] }                       // 韻母後只剩聲調
+        if hasMedial { return [.final, .tone] }              // 介音後可接韻母或聲調
+        if hasInitial { return [.medial, .final, .tone] }    // 聲母後可接介/韻/聲調(含空韻)
+        return [.initial, .medial, .final]                   // 空／音節起：不可先打聲調
+    }
+
     /// 大千鍵字元 → 注音符號（§32 #1 自繪 preedit 用）。
     static let keyToSymbol: [Character: String] = {
         var m: [Character: String] = [:]

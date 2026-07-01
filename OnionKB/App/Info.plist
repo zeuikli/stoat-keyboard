@@ -25,9 +25,9 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.197</string>
+	<string>0.1.198</string>
 	<key>CFBundleVersion</key>
-	<string>0.1.197</string>
+	<string>0.1.198</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

@@ -439,6 +439,8 @@ final class KeyboardViewController: UIInputViewController {
         items.append(toggle("下一詞預測", Self.predictionKey, localOpt(Self.predictionKey, default: true)) { [weak self] v in
             self?.engine.setOption("prediction", v)
         })
+        // §205 動態注音鍵：依組字聲/介/韻/調狀態淡化不可能接續的鍵（對標原廠）
+        items.append(toggle("動態注音鍵（依組字淡化）", Self.dynamicKeysKey, localOpt(Self.dynamicKeysKey, default: true)) { [weak self] _ in self?.updateDynamicKeyState() })
         items.append(toggle("第一列標點", Self.quickPunctKey, localOpt(Self.quickPunctKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         items.append(toggle("第一列顏文字", Self.quickKaomojiKey, localOpt(Self.quickKaomojiKey, default: true)) { [weak self] _ in self?.refreshIdleQuickRow() })
         // 123 標點：自動依中英 / 半形 / 全形（§82）
@@ -1144,6 +1146,25 @@ final class KeyboardViewController: UIInputViewController {
         shiftButton?.setTitle(shiftTitle, for: .normal)
         shiftButton?.setTitleColor(!english ? .systemGray3 : (shiftState == .off ? .label : .systemBlue), for: .normal)
         shiftButton?.backgroundColor = (english && shiftState != .off) ? UIColor.systemBlue.withAlphaComponent(0.15) : KBColor.contentKey
+        updateDynamicKeyState()   // §205 切模式/大小寫後更新動態鍵狀態
+    }
+
+    private static let dynamicKeysKey = "kbopt_dynamicKeys"   // §205 動態注音鍵（依組字禁用不可能接續的鍵）
+    /// §205 依當前組字（聲/介/韻/調狀態機）淡化不可能接續的注音鍵。非注音/英文/關閉時全亮。
+    private func updateDynamicKeyState() {
+        let active = mode == .bopomo && !englishMode && localOpt(Self.dynamicKeysKey, default: true)
+        guard active else {
+            for (_, b, _) in bopomoKeys { b.alpha = 1 }
+            return
+        }
+        let valid = BopomoLayout.validNextClasses(preedit: isPreeditEmpty ? "" : preeditText)
+        for (key, b, _) in bopomoKeys {
+            if let cls = BopomoLayout.phoneClass(key.symbol) {
+                b.alpha = valid.contains(cls) ? 1.0 : 0.28   // 淡化＝視覺提示，仍可點（v1 不硬擋、避免誤擋合法輸入）
+            } else {
+                b.alpha = 1.0
+            }
+        }
     }
 
     // MARK: - Input
@@ -1370,6 +1391,7 @@ final class KeyboardViewController: UIInputViewController {
             compositionSepWrapRef?.isHidden = update.preedit.isEmpty   // §176 分隔線隨注音顯隱
         }
         styleReturnKey()                                         // 組字/清空→ return 灰↔藍即時更新（§110）
+        updateDynamicKeyState()                                  // §205 組字變動→更新動態注音鍵淡化
     }
 
     /// §200 phase2 顯示：候選列（含 grammar 結果）。二階段時 async 延後。
