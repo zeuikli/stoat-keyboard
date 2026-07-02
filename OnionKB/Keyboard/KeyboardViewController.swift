@@ -172,7 +172,7 @@ final class KeyboardViewController: UIInputViewController {
     private var isExpanded = false
     private let kbBackdrop = UIInputView(frame: .zero, inputViewStyle: .keyboard)   // 官方系統鍵盤底材（§105 native 方式）
     /// §146 建置變體旗標：true＝iOS 18 扁平實色版（實心底，非半透材質），出 ios18 IPA 時翻 true。
-    static let flatStyleIOS18 = false
+    static let flatStyleIOS18 = true
     // 真 Liquid Glass 層（§97，官方 UIGlassContainerEffect 容器 + 巢狀 glass）
     private var glassContainer: UIVisualEffectView?
     private var glassKeyButtons: [(button: UIButton, prominent: Bool)] = []   // 本輪 rebuild 登記的玻璃鍵
