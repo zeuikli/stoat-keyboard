@@ -124,11 +124,11 @@ xcodebuild -project OnionKB.xcodeproj -scheme OnionKB \
 
 | 變體 | 名稱 | 詞庫 | IPA | 適用 |
 |------|------|------|-----|------|
-| **full** | **Plus** | 純注音 + 81 萬 phrases.chtp 擴充詞組（table.bin 28MB）| ~56MB（估）| 詞組完整、對齊 Squirrel onionplus |
-| **plustrim** | **Plus 精選** | Plus 依 essay 語料頻率篩留 35.6 萬詞（table.bin 14MB，§175）| **38MB**（0.1.215 實測）| 詞彙豐富又輕快、容量與流暢度平衡（**0.1.183 起穩定版採用**）|
-| **lite** | **純注音** | 純注音核心（~118K，table.bin 7.5MB）| ~28MB（估）| 輕量、省記憶體 |
+| **full** | **Plus** | 純注音 + 81 萬 phrases.chtp 擴充詞組（table.bin 28MB）| **56MB** | 詞組完整、對齊 Squirrel onionplus |
+| **plustrim** | **Plus 精選** | Plus 依 essay 語料頻率篩留 35.6 萬詞（table.bin 14MB，§175）| **38MB** | 詞彙豐富又輕快、容量與流暢度平衡（**0.1.183 起穩定版採用**）|
+| **lite** | **純注音** | 純注音核心（~118K，table.bin 7.5MB）| **26MB** | 輕量、省記憶體 |
 
-> IPA 自 0.1.215 起於打包時自容器 App 層剝除 `predict_office.db`＋`.gram`（僅鍵盤 appex 執行期需要，−11.6MB 未壓縮，§222）；full/lite 未重新量測、以 plustrim 差距推估。
+> IPA 體積皆 0.1.215 實測。自 0.1.215 起打包時自容器 App 層剝除 `predict_office.db`＋`.gram`（僅鍵盤 appex 執行期需要，−11.6MB 未壓縮，§222）。
 
 三者皆 B 方案（bgc grammar，候選出「為」）+ librime 1.17.0（runtime 引擎版號；`RimeData-variants/*/build.version` 的 1.16.1 為預編譯詞庫時 macOS 端 librime 版號，屬資料層、兩者相容），且**表情候選已接線**（打「哈哈哈」候選列出 🤣，schema 掛 `simplifier@emoji`）。
 > 變體 .bin 存於 `RimeData-variants/`（不在 `RimeData/` 內，避免 bundle folder reference 把兩變體都打包進 IPA）。
