@@ -21,6 +21,8 @@ protocol RimeEngine: AnyObject {
     func processKeyPreedit(_ keycode: Int32) -> RimeUpdate
     /// §200 二階段 phase2：當前候選（觸發 get_context → 翻譯 + octagram grammar，昂貴 → 由 UI async 延後）。
     func fetchCandidates() -> [Candidate]
+    /// §222 組字中？（get_input，便宜）——space/⌫/↵ 的引擎真值路由：main 的 preeditText 可能落後 in-flight 鍵。
+    func isComposing() -> Bool
     func selectCandidate(_ index: Int) -> RimeUpdate
     func allCandidates() -> [Candidate]                       // 全候選（展開面板，§89）
     func selectCandidateAbsolute(_ index: Int) -> RimeUpdate  // 絕對索引選字（展開面板，§89）
@@ -49,6 +51,7 @@ final class RimeEngineStub: RimeEngine {
     func fetchCandidates() -> [Candidate] {
         buffer.isEmpty ? [] : [Candidate(text: "（無引擎）", comment: nil)]
     }
+    func isComposing() -> Bool { !buffer.isEmpty }   // §222
     func selectCandidate(_ index: Int) -> RimeUpdate {
         let t = buffer; buffer = ""
         return RimeUpdate(preedit: "", candidates: [], commit: t)

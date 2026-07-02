@@ -34,6 +34,9 @@ final class RimeEngineLibrime: RimeEngine {
         bridge.candidates().map { Candidate(text: $0.text, comment: $0.comment) }
     }
 
+    /// §222 組字中？（get_input，便宜 FFI）。
+    func isComposing() -> Bool { !bridge.rawInput().isEmpty }
+
     func selectCandidate(_ index: Int) -> RimeUpdate {
         bridge.selectCandidate(Int32(index))
         return snapshot()
