@@ -1,0 +1,16 @@
+{
+  "name": "Old glyph variants to common forms (舊字形→通行)",
+  "segmentation": {
+    "type": "mmseg",
+    "dict": {
+      "type": "text",
+      "file": "variant_normalize.txt"
+    }
+  },
+  "conversion_chain": [{
+    "dict": {
+      "type": "text",
+      "file": "variant_normalize.txt"
+    }
+  }]
+}

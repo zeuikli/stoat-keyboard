@@ -26,6 +26,10 @@ log "封裝 Payload → .ipa"
 rm -rf "$OUT" "build/Payload"
 mkdir -p "$OUT" "build/Payload"
 cp -R "$APP" "build/Payload/"
+# §222 App 層瘦身：predict_office.db(7.5M)+gram(4M) 僅鍵盤 appex 執行期讀（predictor/octagram），
+# 容器 App 只跑 deploy（不開互動 session、不讀這兩檔）→ 從 App 層剝除、appex 內保留。未壓縮 −11.6MB。
+rm -f "build/Payload/OnionKB.app/RimeData/shared/predict_office.db" \
+      "build/Payload/OnionKB.app/RimeData/shared/zh-hant-t-essay-bgc.gram"
 ( cd build && /usr/bin/zip -qry "../$OUT/OnionKB.ipa" Payload )
 rm -rf "build/Payload"
 
